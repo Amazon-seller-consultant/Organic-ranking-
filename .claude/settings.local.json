@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-git)",
+      "Bash(npm --version)",
+      "Bash(npm init *)",
+      "Bash(npm install *)",
+      "Bash(pnpm --version)",
+      "Bash(bun --version)",
+      "Bash(yarn --version)",
+      "Bash(pip3 --version)",
+      "Bash(pip3 install *)",
+      "Bash(chmod +x /Users/denizolmez/Desktop/AI/new/start.sh)",
+      "Bash(python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload)",
+      "Bash(curl -s http://localhost:8000/)",
+      "Bash(pkill -f \"uvicorn main:app\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8000/)",
+      "Bash(pkill -f \"uvicorn main:app\" 2>/dev/null; sleep 1; python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload > /tmp/server.log 2>&1 & *)",
+      "Bash(curl -s -X POST http://localhost:8000/api/suggest-terms -H 'Content-Type: application/json' -d '{\"asin\":\"B08N5WRWNW\",\"product_title\":\"Echo Dot 4th Gen\"}')",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8000/api/template.csv)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8000/static/asin_rank_template.xlsx)",
+      "Bash(git init *)",
+      "Bash(git add *)"
+    ]
+  }
+}

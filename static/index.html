@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Amazon Rank Tracker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2e3347;
+      --accent: #ff9900;
+      --accent-dim: rgba(255,153,0,0.15);
+      --accent2: #6366f1;
+      --text: #e8eaf0;
+      --text-muted: #8892a4;
+      --success: #22c55e;
+      --danger: #ef4444;
+      --warn: #f59e0b;
+      --radius: 12px;
+      --radius-sm: 7px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 0 0 60px;
+    }
+
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, #1a1d27 0%, #0f1117 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 20px 40px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .header-icon {
+      width: 40px; height: 40px;
+      background: var(--accent);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+    }
+    .header h1 { font-size: 20px; font-weight: 700; color: var(--text); }
+    .header p { font-size: 13px; color: var(--text-muted); margin-top: 1px; }
+
+    /* Layout */
+    .container { max-width: 900px; margin: 0 auto; padding: 36px 24px 0; }
+
+    /* Mode tabs */
+    .mode-tabs {
+      display: flex; gap: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 5px; margin-bottom: 28px;
+    }
+    .mode-tab {
+      flex: 1; padding: 10px 16px;
+      border-radius: 8px; border: none;
+      background: transparent; color: var(--text-muted);
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: all 0.18s;
+    }
+    .mode-tab.active { background: var(--accent); color: #000; }
+    .mode-tab:not(.active):hover { color: var(--text); }
+
+    /* Steps */
+    .step-indicator {
+      display: flex; gap: 0; margin-bottom: 36px;
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .step {
+      flex: 1; padding: 12px 16px;
+      display: flex; align-items: center; gap: 10px;
+      background: var(--surface);
+      font-size: 13px; color: var(--text-muted);
+      border-right: 1px solid var(--border);
+      transition: all 0.2s;
+    }
+    .step:last-child { border-right: none; }
+    .step.active { background: var(--accent-dim); color: var(--accent); }
+    .step.done { background: var(--surface); color: var(--success); }
+    .step-num {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700;
+      background: var(--surface2);
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+    .step.active .step-num { background: var(--accent); color: #000; }
+    .step.done .step-num { background: var(--success); color: #fff; }
+
+    /* Cards */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 15px; font-weight: 700;
+      margin-bottom: 18px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .card-title .badge {
+      font-size: 11px; font-weight: 600;
+      background: var(--accent-dim); color: var(--accent);
+      padding: 2px 8px; border-radius: 20px;
+    }
+
+    /* Inputs */
+    .input-row { display: flex; gap: 10px; }
+    input[type="text"] {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 11px 14px;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input[type="text"]:focus { border-color: var(--accent); }
+    input[type="text"]::placeholder { color: var(--text-muted); }
+
+    /* Buttons */
+    .btn {
+      padding: 11px 20px;
+      border-radius: var(--radius-sm);
+      border: none;
+      font-size: 14px; font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: inline-flex; align-items: center; gap: 7px;
+      white-space: nowrap;
+    }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-primary {
+      background: var(--accent); color: #000;
+    }
+    .btn-primary:hover:not(:disabled) { background: #ffaa20; }
+    .btn-secondary {
+      background: var(--surface2); color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+    .btn-ai {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: white;
+    }
+    .btn-ai:hover:not(:disabled) { opacity: 0.88; }
+    .btn-danger {
+      background: transparent; color: var(--text-muted);
+      border: none; padding: 4px 8px; font-size: 13px;
+    }
+    .btn-danger:hover { color: var(--danger); }
+    .btn-lg { padding: 14px 28px; font-size: 15px; }
+
+    /* Product preview */
+    .product-preview {
+      display: flex; gap: 16px; align-items: flex-start;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px; margin-top: 16px;
+    }
+    .product-preview img {
+      width: 70px; height: 70px; object-fit: contain;
+      border-radius: 6px; background: #fff;
+      flex-shrink: 0;
+    }
+    .product-info h3 { font-size: 14px; font-weight: 600; line-height: 1.4; }
+    .product-info p { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+    .asin-badge {
+      display: inline-block;
+      background: var(--accent-dim); color: var(--accent);
+      font-size: 11px; font-weight: 700;
+      padding: 2px 8px; border-radius: 4px; margin-top: 6px;
+    }
+
+    /* Search terms list */
+    .terms-list {
+      display: flex; flex-direction: column; gap: 6px;
+      margin-top: 14px; max-height: 320px; overflow-y: auto;
+    }
+    .term-item {
+      display: flex; align-items: center;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 9px 12px;
+      gap: 8px;
+    }
+    .term-item .term-text { flex: 1; font-size: 13px; }
+    .term-item.ai-suggested .term-text::after {
+      content: 'AI';
+      font-size: 10px; font-weight: 700;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: white; padding: 1px 5px; border-radius: 3px;
+      margin-left: 8px; vertical-align: middle;
+    }
+
+    .terms-actions {
+      display: flex; gap: 8px; margin-top: 14px;
+      flex-wrap: wrap;
+    }
+
+    /* Results table */
+    .results-table {
+      width: 100%; border-collapse: collapse;
+      margin-top: 8px; font-size: 14px;
+    }
+    .results-table th {
+      text-align: left; padding: 10px 14px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      color: var(--text-muted); font-size: 12px;
+      font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .results-table th:first-child { border-radius: var(--radius-sm) 0 0 0; }
+    .results-table th:last-child { border-radius: 0 var(--radius-sm) 0 0; }
+    .results-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .results-table tr:last-child td { border-bottom: none; }
+    .results-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+    .rank-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 40px; height: 40px;
+      border-radius: 8px;
+      font-weight: 700; font-size: 15px;
+    }
+    .rank-top { background: rgba(34,197,94,0.15); color: var(--success); }
+    .rank-mid { background: rgba(245,158,11,0.15); color: var(--warn); }
+    .rank-low { background: rgba(239,68,68,0.15); color: var(--danger); }
+    .rank-none { background: var(--surface2); color: var(--text-muted); font-size: 11px; }
+
+    .page-badge {
+      font-size: 12px; color: var(--text-muted);
+      background: var(--surface2);
+      padding: 3px 8px; border-radius: 4px;
+    }
+
+    /* Progress */
+    .progress-bar {
+      height: 4px; background: var(--surface2);
+      border-radius: 2px; overflow: hidden; margin-top: 16px;
+    }
+    .progress-fill {
+      height: 100%; background: var(--accent);
+      border-radius: 2px; transition: width 0.3s;
+    }
+    .progress-text { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+
+    /* Status */
+    .status-msg {
+      font-size: 13px; padding: 10px 14px;
+      border-radius: var(--radius-sm); margin-top: 12px;
+    }
+    .status-error { background: rgba(239,68,68,0.12); color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
+    .status-info { background: rgba(99,102,241,0.12); color: #818cf8; border: 1px solid rgba(99,102,241,0.2); }
+
+    /* Loading spinner */
+    .spinner {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid transparent; border-top-color: currentColor;
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Summary bar */
+    .summary-bar {
+      display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;
+    }
+    .summary-stat {
+      flex: 1; min-width: 120px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 14px 16px;
+      text-align: center;
+    }
+    .summary-stat .val { font-size: 24px; font-weight: 700; }
+    .summary-stat .lbl { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .val-green { color: var(--success); }
+    .val-orange { color: var(--accent); }
+    .val-red { color: var(--danger); }
+
+    /* Export button */
+    .export-row { display: flex; justify-content: flex-end; margin-bottom: 14px; }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 48px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: var(--surface2);
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+    .drop-zone-icon { font-size: 40px; margin-bottom: 12px; }
+    .drop-zone h3 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+    .drop-zone p { font-size: 13px; color: var(--text-muted); }
+    .drop-zone input[type="file"] { display: none; }
+
+    /* Template download row */
+    .template-row {
+      display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; align-items: center;
+    }
+    .template-row span { font-size: 13px; color: var(--text-muted); }
+
+    /* File preview table */
+    .preview-table {
+      width: 100%; border-collapse: collapse;
+      font-size: 13px; margin-top: 14px;
+    }
+    .preview-table th {
+      text-align: left; padding: 8px 12px;
+      background: var(--surface2); border-bottom: 1px solid var(--border);
+      color: var(--text-muted); font-size: 11px; text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .preview-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); }
+    .preview-table tr:last-child td { border-bottom: none; }
+    .terms-pill {
+      display: inline-block; background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px; padding: 2px 7px;
+      font-size: 11px; margin: 2px;
+    }
+
+    /* Bulk results */
+    .bulk-asin-block {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 14px; overflow: hidden;
+    }
+    .bulk-asin-header {
+      display: flex; align-items: center; gap: 12px;
+      background: var(--surface2); padding: 12px 16px;
+      cursor: pointer;
+    }
+    .bulk-asin-header:hover { background: #262a3e; }
+    .bulk-asin-title { flex: 1; font-weight: 600; font-size: 14px; }
+    .bulk-asin-meta { font-size: 12px; color: var(--text-muted); }
+    .bulk-asin-body { display: none; }
+    .bulk-asin-body.open { display: block; }
+    .chevron { font-size: 11px; transition: transform 0.2s; }
+    .chevron.open { transform: rotate(180deg); }
+
+    /* Hidden */
+    .hidden { display: none !important; }
+
+    /* Marketplace selector */
+    select {
+      background: var(--surface2); color: var(--text);
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 11px 12px; font-size: 14px; outline: none;
+      cursor: pointer;
+    }
+    select:focus { border-color: var(--accent); }
+
+    .section-divider {
+      border: none; border-top: 1px solid var(--border); margin: 20px 0;
+    }
+    label { font-size: 13px; color: var(--text-muted); display: block; margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-icon">📦</div>
+  <div>
+    <h1>Amazon Rank Tracker</h1>
+    <p>Find your ASIN's organic position for any search term</p>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Mode Tabs -->
+  <div class="mode-tabs">
+    <button class="mode-tab active" id="tab-single" onclick="switchMode('single')">🔍 Single ASIN</button>
+    <button class="mode-tab" id="tab-bulk" onclick="switchMode('bulk')">📂 Bulk Upload</button>
+  </div>
+
+  <!-- Single ASIN mode wrapper -->
+  <div id="mode-single">
+
+  <!-- Step Indicator -->
+  <div class="step-indicator">
+    <div class="step active" id="step1-ind">
+      <div class="step-num">1</div>
+      Enter ASIN
+    </div>
+    <div class="step" id="step2-ind">
+      <div class="step-num">2</div>
+      Search Terms
+    </div>
+    <div class="step" id="step3-ind">
+      <div class="step-num">3</div>
+      View Rankings
+    </div>
+  </div>
+
+  <!-- Step 1: ASIN Input -->
+  <div class="card" id="section-asin">
+    <div class="card-title">
+      Enter your Amazon ASIN
+      <span class="badge">Step 1</span>
+    </div>
+    <div style="display:flex; gap:10px; margin-bottom:10px;">
+      <div style="flex:1">
+        <label>ASIN Number</label>
+        <input type="text" id="asin-input" placeholder="e.g. B08N5WRWNW" maxlength="12" />
+      </div>
+      <div>
+        <label>Marketplace</label>
+        <select id="marketplace-select">
+          <option value="amazon.com">🇺🇸 amazon.com</option>
+          <option value="amazon.co.uk">🇬🇧 amazon.co.uk</option>
+          <option value="amazon.de">🇩🇪 amazon.de</option>
+          <option value="amazon.fr">🇫🇷 amazon.fr</option>
+          <option value="amazon.it">🇮🇹 amazon.it</option>
+          <option value="amazon.es">🇪🇸 amazon.es</option>
+          <option value="amazon.ca">🇨🇦 amazon.ca</option>
+          <option value="amazon.co.jp">🇯🇵 amazon.co.jp</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="fetch-btn" onclick="fetchProduct()">
+      Fetch Product Info
+    </button>
+
+    <div id="product-preview" class="product-preview hidden">
+      <img id="product-img" src="" alt="" />
+      <div class="product-info">
+        <h3 id="product-title"></h3>
+        <p id="product-brand"></p>
+        <span class="asin-badge" id="product-asin"></span>
+      </div>
+    </div>
+
+    <div id="asin-error" class="status-msg status-error hidden"></div>
+
+    <div id="goto-step2-row" class="hidden" style="margin-top:16px;">
+      <button class="btn btn-primary" onclick="goToStep2()">Continue to Search Terms →</button>
+    </div>
+  </div>
+
+  <!-- Step 2: Search Terms -->
+  <div class="card hidden" id="section-terms">
+    <div class="card-title">
+      Add Search Terms
+      <span class="badge">Step 2</span>
+    </div>
+
+    <div class="input-row">
+      <input type="text" id="term-input" placeholder="Enter a search term and press Add or Enter"
+        onkeydown="if(event.key==='Enter') addTermManual()" />
+      <button class="btn btn-secondary" onclick="addTermManual()">+ Add</button>
+    </div>
+
+    <div class="terms-actions">
+      <button class="btn btn-ai" id="ai-suggest-btn" onclick="suggestTerms()">
+        ✨ AI Suggest Terms
+      </button>
+      <button class="btn btn-secondary" id="clear-terms-btn" onclick="clearTerms()">Clear All</button>
+    </div>
+
+    <div id="ai-status" class="status-msg status-info hidden"></div>
+    <div id="terms-empty" style="font-size:13px;color:var(--text-muted);margin-top:14px;" class="hidden">
+      No terms added yet. Type a term above or use AI suggestions.
+    </div>
+    <div class="terms-list" id="terms-list"></div>
+
+    <hr class="section-divider" />
+    <button class="btn btn-primary btn-lg" id="check-rankings-btn" onclick="checkRankings()" disabled>
+      🔍 Check Rankings
+    </button>
+    <div id="progress-container" class="hidden">
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+      <div class="progress-text" id="progress-text">Searching...</div>
+    </div>
+    <div id="terms-error" class="status-msg status-error hidden"></div>
+  </div>
+
+  <!-- Step 3: Results -->
+  <div class="card hidden" id="section-results">
+    <div class="card-title">
+      Ranking Results
+      <span class="badge">Step 3</span>
+    </div>
+
+    <div class="summary-bar" id="summary-bar"></div>
+
+    <div class="export-row">
+      <button class="btn btn-secondary" onclick="exportCSV()">⬇ Export CSV</button>
+    </div>
+
+    <table class="results-table">
+      <thead>
+        <tr>
+          <th>Search Term</th>
+          <th>Position</th>
+          <th>Page</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="results-body"></tbody>
+    </table>
+
+    <div style="margin-top:20px;">
+      <button class="btn btn-secondary" onclick="resetAll()">← Start Over</button>
+      <button class="btn btn-primary" onclick="recheck()" style="margin-left:10px;">🔄 Re-check Rankings</button>
+    </div>
+  </div>
+
+  </div><!-- end mode-single -->
+
+  <!-- Bulk Upload mode -->
+  <div id="mode-bulk" class="hidden">
+
+    <!-- Upload card -->
+    <div class="card">
+      <div class="card-title">Upload ASIN + Search Terms File</div>
+
+      <div class="drop-zone" id="drop-zone" onclick="document.getElementById('bulk-file-input').click()"
+        ondragover="event.preventDefault(); this.classList.add('drag-over')"
+        ondragleave="this.classList.remove('drag-over')"
+        ondrop="handleDrop(event)">
+        <input type="file" id="bulk-file-input" accept=".csv,.xlsx" onchange="handleFileSelect(event)" />
+        <div class="drop-zone-icon">📄</div>
+        <h3>Drop your CSV or Excel file here</h3>
+        <p>or click to browse &nbsp;·&nbsp; .csv and .xlsx supported</p>
+      </div>
+
+      <div class="template-row">
+        <span>Don't have a file yet? Download a template:</span>
+        <button class="btn btn-secondary" onclick="downloadTemplate('xlsx')">⬇ Excel Template (.xlsx)</button>
+        <button class="btn btn-secondary" onclick="downloadTemplate('csv')">⬇ CSV Template (.csv)</button>
+      </div>
+    </div>
+
+    <!-- File preview card -->
+    <div class="card hidden" id="bulk-preview-card">
+      <div class="card-title" id="bulk-preview-title">File Preview</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">
+        Showing the ASINs and search terms parsed from your file. Remove any row you don't need before running.
+      </p>
+      <div style="overflow-x:auto;">
+        <table class="preview-table">
+          <thead>
+            <tr>
+              <th>ASIN</th>
+              <th>Marketplace</th>
+              <th>Search Terms</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="bulk-preview-body"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:18px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <button class="btn btn-primary btn-lg" id="bulk-run-btn" onclick="runBulkCheck()">
+          🔍 Run Bulk Check
+        </button>
+        <button class="btn btn-secondary" onclick="clearBulk()">Clear</button>
+        <span id="bulk-count-label" style="font-size:13px;color:var(--text-muted);"></span>
+      </div>
+      <div id="bulk-progress-container" class="hidden" style="margin-top:16px;">
+        <div class="progress-bar"><div class="progress-fill" id="bulk-progress-fill" style="width:0%"></div></div>
+        <div class="progress-text" id="bulk-progress-text">Running bulk check…</div>
+      </div>
+      <div id="bulk-error" class="status-msg status-error hidden"></div>
+    </div>
+
+    <!-- Bulk results card -->
+    <div class="card hidden" id="bulk-results-card">
+      <div class="card-title">Bulk Ranking Results</div>
+      <div class="summary-bar" id="bulk-summary-bar"></div>
+      <div class="export-row">
+        <button class="btn btn-secondary" onclick="exportBulkCSV()">⬇ Export All as CSV</button>
+      </div>
+      <div id="bulk-results-body"></div>
+    </div>
+
+  </div><!-- end mode-bulk -->
+
+</div>
+
+<script>
+  // When opened as file:// or from a different origin, point directly at the API server
+  const API_BASE = window.location.protocol === 'file:' || window.location.port !== '8000'
+    ? 'http://localhost:8000'
+    : '';
+
+  let currentASIN = '';
+  let currentTitle = '';
+  let currentMarketplace = 'amazon.com';
+  let terms = []; // { text, source: 'manual'|'ai' }
+  let lastResults = [];
+
+  function setStepActive(n) {
+    [1,2,3].forEach(i => {
+      const el = document.getElementById(`step${i}-ind`);
+      el.className = 'step' + (i < n ? ' done' : i === n ? ' active' : '');
+      if (i < n) el.querySelector('.step-num').textContent = '✓';
+      else el.querySelector('.step-num').textContent = i;
+    });
+  }
+
+  async function fetchProduct() {
+    const asin = document.getElementById('asin-input').value.trim().toUpperCase();
+    const marketplace = document.getElementById('marketplace-select').value;
+    if (!asin) return showAsinError('Please enter an ASIN.');
+
+    const btn = document.getElementById('fetch-btn');
+    btn.innerHTML = '<span class="spinner"></span> Fetching...';
+    btn.disabled = true;
+    hideEl('asin-error');
+    hideEl('product-preview');
+    hideEl('goto-step2-row');
+
+    try {
+      const res = await fetch(`${API_BASE}/api/product-info`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ asin })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to fetch product.');
+
+      currentASIN = data.asin;
+      currentTitle = data.title;
+      currentMarketplace = marketplace;
+
+      document.getElementById('product-img').src = data.image || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="70" height="70"><rect width="70" height="70" fill="%23333"/><text x="35" y="40" text-anchor="middle" fill="%23888" font-size="24">📦</text></svg>';
+      document.getElementById('product-title').textContent = data.title;
+      document.getElementById('product-brand').textContent = data.brand ? `Brand: ${data.brand}` : '';
+      document.getElementById('product-asin').textContent = data.asin;
+      showEl('product-preview');
+      showEl('goto-step2-row');
+
+    } catch (e) {
+      showAsinError(e.message);
+    } finally {
+      btn.innerHTML = 'Fetch Product Info';
+      btn.disabled = false;
+    }
+  }
+
+  function goToStep2() {
+    showEl('section-terms');
+    hideEl('goto-step2-row');
+    setStepActive(2);
+    renderTerms();
+    document.getElementById('term-input').focus();
+  }
+
+  function addTermManual() {
+    const input = document.getElementById('term-input');
+    const val = input.value.trim();
+    if (!val) return;
+    if (terms.find(t => t.text.toLowerCase() === val.toLowerCase())) {
+      input.value = '';
+      return;
+    }
+    terms.push({ text: val, source: 'manual' });
+    input.value = '';
+    renderTerms();
+  }
+
+  async function suggestTerms() {
+    if (!currentASIN) return;
+    const btn = document.getElementById('ai-suggest-btn');
+    btn.innerHTML = '<span class="spinner"></span> Generating...';
+    btn.disabled = true;
+    showEl('ai-status');
+    document.getElementById('ai-status').textContent = '✨ Claude is generating relevant search terms based on your product...';
+
+    try {
+      const res = await fetch(`${API_BASE}/api/suggest-terms`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ asin: currentASIN, product_title: currentTitle })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'AI suggestion failed.');
+
+      let added = 0;
+      data.terms.forEach(t => {
+        if (!terms.find(x => x.text.toLowerCase() === t.toLowerCase())) {
+          terms.push({ text: t, source: 'ai' });
+          added++;
+        }
+      });
+      hideEl('ai-status');
+      renderTerms();
+
+    } catch (e) {
+      document.getElementById('ai-status').textContent = '⚠ ' + e.message;
+      document.getElementById('ai-status').className = 'status-msg status-error';
+      showEl('ai-status');
+    } finally {
+      btn.innerHTML = '✨ AI Suggest Terms';
+      btn.disabled = false;
+    }
+  }
+
+  function removeTerm(idx) {
+    terms.splice(idx, 1);
+    renderTerms();
+  }
+
+  function clearTerms() {
+    terms = [];
+    renderTerms();
+  }
+
+  function renderTerms() {
+    const list = document.getElementById('terms-list');
+    const empty = document.getElementById('terms-empty');
+    const checkBtn = document.getElementById('check-rankings-btn');
+
+    if (terms.length === 0) {
+      list.innerHTML = '';
+      showEl('terms-empty');
+      checkBtn.disabled = true;
+    } else {
+      hideEl('terms-empty');
+      checkBtn.disabled = false;
+      list.innerHTML = terms.map((t, i) => `
+        <div class="term-item ${t.source === 'ai' ? 'ai-suggested' : ''}">
+          <span class="term-text">${escHtml(t.text)}</span>
+          <button class="btn btn-danger" onclick="removeTerm(${i})">✕</button>
+        </div>
+      `).join('');
+    }
+  }
+
+  async function checkRankings() {
+    if (terms.length === 0) return;
+
+    const btn = document.getElementById('check-rankings-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Checking...';
+    showEl('progress-container');
+    hideEl('terms-error');
+    hideEl('section-results');
+
+    const fill = document.getElementById('progress-fill');
+    const ptext = document.getElementById('progress-text');
+
+    // Animate progress (fake progress while waiting)
+    let fakeProgress = 0;
+    const fakeInterval = setInterval(() => {
+      fakeProgress = Math.min(fakeProgress + (100 / (terms.length * 8)), 88);
+      fill.style.width = fakeProgress + '%';
+      ptext.textContent = `Searching Amazon for ${terms.length} term${terms.length>1?'s':''}...`;
+    }, 400);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/check-rankings`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          asin: currentASIN,
+          terms: terms.map(t => t.text),
+          marketplace: currentMarketplace
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Ranking check failed.');
+
+      clearInterval(fakeInterval);
+      fill.style.width = '100%';
+      ptext.textContent = 'Done!';
+
+      lastResults = data.results;
+      setTimeout(() => {
+        hideEl('progress-container');
+        renderResults(data.results);
+        showEl('section-results');
+        setStepActive(3);
+        document.getElementById('section-results').scrollIntoView({ behavior: 'smooth' });
+      }, 500);
+
+    } catch (e) {
+      clearInterval(fakeInterval);
+      hideEl('progress-container');
+      document.getElementById('terms-error').textContent = '⚠ ' + e.message;
+      showEl('terms-error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '🔍 Check Rankings';
+    }
+  }
+
+  function renderResults(results) {
+    const found = results.filter(r => r.found);
+    const top10 = results.filter(r => r.found && r.position <= 10);
+    const top30 = results.filter(r => r.found && r.position <= 30);
+    const notFound = results.filter(r => !r.found);
+
+    document.getElementById('summary-bar').innerHTML = `
+      <div class="summary-stat">
+        <div class="val val-green">${found.length}</div>
+        <div class="lbl">Terms Found</div>
+      </div>
+      <div class="summary-stat">
+        <div class="val val-green">${top10.length}</div>
+        <div class="lbl">Top 10 Rankings</div>
+      </div>
+      <div class="summary-stat">
+        <div class="val val-orange">${top30.length}</div>
+        <div class="lbl">Top 30 Rankings</div>
+      </div>
+      <div class="summary-stat">
+        <div class="val val-red">${notFound.length}</div>
+        <div class="lbl">Not Found (top 3 pages)</div>
+      </div>
+    `;
+
+    const sorted = [...results].sort((a, b) => {
+      if (a.found && !b.found) return -1;
+      if (!a.found && b.found) return 1;
+      return a.position - b.position;
+    });
+
+    document.getElementById('results-body').innerHTML = sorted.map(r => {
+      let rankEl, rankClass, statusEl;
+
+      if (r.found) {
+        if (r.position <= 10) rankClass = 'rank-top';
+        else if (r.position <= 30) rankClass = 'rank-mid';
+        else rankClass = 'rank-low';
+
+        rankEl = `<span class="rank-badge ${rankClass}">#${r.position}</span>`;
+        const pageEl = `<span class="page-badge">Page ${r.page}</span>`;
+        statusEl = `<span style="color:var(--success);font-size:13px;">✓ Ranked</span>`;
+
+        return `<tr>
+          <td style="font-weight:500">${escHtml(r.term)}</td>
+          <td>${rankEl}</td>
+          <td>${pageEl}</td>
+          <td>${statusEl}</td>
+        </tr>`;
+      } else {
+        return `<tr>
+          <td style="font-weight:500">${escHtml(r.term)}</td>
+          <td><span class="rank-badge rank-none">—</span></td>
+          <td><span class="page-badge">—</span></td>
+          <td><span style="color:var(--text-muted);font-size:13px;">Not in top 3 pages</span></td>
+        </tr>`;
+      }
+    }).join('');
+  }
+
+  function exportCSV() {
+    if (!lastResults.length) return;
+    const rows = [['Search Term', 'Position', 'Page', 'Status', 'ASIN']];
+    lastResults.forEach(r => {
+      rows.push([
+        `"${r.term}"`,
+        r.found ? r.position : '',
+        r.found ? r.page : '',
+        r.found ? 'Ranked' : 'Not found',
+        currentASIN
+      ]);
+    });
+    const csv = rows.map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `rankings-${currentASIN}-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  }
+
+  function recheck() {
+    hideEl('section-results');
+    checkRankings();
+  }
+
+  function resetAll() {
+    currentASIN = ''; currentTitle = ''; terms = []; lastResults = [];
+    document.getElementById('asin-input').value = '';
+    hideEl('product-preview'); hideEl('goto-step2-row'); hideEl('section-terms'); hideEl('section-results');
+    hideEl('asin-error'); hideEl('ai-status'); hideEl('terms-error'); hideEl('progress-container');
+    document.getElementById('terms-list').innerHTML = '';
+    setStepActive(1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function showAsinError(msg) {
+    const el = document.getElementById('asin-error');
+    el.textContent = '⚠ ' + msg;
+    showEl('asin-error');
+  }
+
+  function showEl(id) { document.getElementById(id)?.classList.remove('hidden'); }
+  function hideEl(id) { document.getElementById(id)?.classList.add('hidden'); }
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Allow Enter key on ASIN input
+  document.getElementById('asin-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') fetchProduct();
+  });
+
+  // ── Bulk Upload ─────────────────────────────────────────────
+
+  let bulkEntries = []; // [{ asin, marketplace, terms[] }]
+  let bulkResults = [];
+
+  function switchMode(mode) {
+    const isSingle = mode === 'single';
+    document.getElementById('mode-single').classList.toggle('hidden', !isSingle);
+    document.getElementById('mode-bulk').classList.toggle('hidden', isSingle);
+    document.getElementById('tab-single').classList.toggle('active', isSingle);
+    document.getElementById('tab-bulk').classList.toggle('active', !isSingle);
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    document.getElementById('drop-zone').classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) processFile(file);
+  }
+
+  function handleFileSelect(e) {
+    const file = e.target.files[0];
+    if (file) processFile(file);
+  }
+
+  function processFile(file) {
+    const name = file.name.toLowerCase();
+    if (!name.endsWith('.csv') && !name.endsWith('.xlsx')) {
+      alert('Please upload a .csv or .xlsx file.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (name.endsWith('.csv')) {
+        parseCSV(e.target.result, file.name);
+      } else {
+        // For xlsx we send to the server for preview parsing via a lightweight endpoint
+        sendForPreview(file);
+      }
+    };
+    if (name.endsWith('.csv')) {
+      reader.readAsText(file);
+    } else {
+      sendForPreview(file);
+    }
+  }
+
+  function parseCSV(text, filename) {
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) { showBulkError('File appears empty or has no data rows.'); return; }
+
+    // Skip header row
+    const dataLines = lines.slice(1);
+    bulkEntries = [];
+
+    for (const line of dataLines) {
+      const cols = parseCSVLine(line);
+      const asin = (cols[0] || '').trim().toUpperCase();
+      if (!asin || asin === 'ASIN') continue;
+      const marketplace = (cols[1] || '').trim() || 'amazon.com';
+      const terms = cols.slice(2).map(t => t.trim()).filter(Boolean);
+      if (asin && terms.length) bulkEntries.push({ asin, marketplace, terms });
+    }
+
+    renderBulkPreview(filename);
+  }
+
+  function parseCSVLine(line) {
+    const result = []; let cur = ''; let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { result.push(cur); cur = ''; }
+      else { cur += ch; }
+    }
+    result.push(cur);
+    return result.map(s => s.replace(/^"|"$/g, '').trim());
+  }
+
+  async function sendForPreview(file) {
+    // Upload the xlsx file to bulk-check with a parse-only flag isn't available,
+    // so we use a lightweight parse by uploading and getting the preview back.
+    // We'll re-upload on run — simpler approach: parse client-side isn't possible for xlsx,
+    // so store the File object and preview by uploading with a ?preview=1 flag.
+    // Instead: just show the file name and let server parse on run.
+    // For now show a simplified preview for xlsx.
+    bulkEntries = [{ _xlsxFile: file }]; // sentinel
+    document.getElementById('bulk-preview-card').classList.remove('hidden');
+    document.getElementById('bulk-preview-title').textContent = `File Ready: ${file.name}`;
+    document.getElementById('bulk-preview-body').innerHTML = `
+      <tr><td colspan="4" style="color:var(--text-muted);font-size:13px;padding:16px;">
+        Excel file selected: <strong>${escHtml(file.name)}</strong>.
+        ASINs and terms will be parsed when you click Run Bulk Check.
+      </td></tr>`;
+    document.getElementById('bulk-count-label').textContent = '';
+    document.getElementById('bulk-run-btn').disabled = false;
+    hideEl('bulk-error');
+    // Store file ref for upload
+    window._bulkXlsxFile = file;
+  }
+
+  function renderBulkPreview(filename) {
+    if (!bulkEntries.length) {
+      showBulkError('No valid rows found. Make sure your file has ASIN in column A and at least one search term.');
+      return;
+    }
+    hideEl('bulk-error');
+    document.getElementById('bulk-preview-card').classList.remove('hidden');
+    document.getElementById('bulk-preview-title').textContent =
+      `Preview: ${filename} — ${bulkEntries.length} ASIN${bulkEntries.length > 1 ? 's' : ''} found`;
+    document.getElementById('bulk-count-label').textContent =
+      `${bulkEntries.reduce((s,e) => s + e.terms.length, 0)} total searches`;
+
+    document.getElementById('bulk-preview-body').innerHTML = bulkEntries.map((e, i) => `
+      <tr>
+        <td><strong>${escHtml(e.asin)}</strong></td>
+        <td><span style="font-size:12px;color:var(--text-muted)">${escHtml(e.marketplace)}</span></td>
+        <td>${e.terms.map(t => `<span class="terms-pill">${escHtml(t)}</span>`).join('')}</td>
+        <td><button class="btn btn-danger" onclick="removeBulkEntry(${i})">✕</button></td>
+      </tr>`).join('');
+
+    document.getElementById('bulk-run-btn').disabled = false;
+  }
+
+  function removeBulkEntry(i) {
+    bulkEntries.splice(i, 1);
+    renderBulkPreview('file');
+  }
+
+  function clearBulk() {
+    bulkEntries = []; bulkResults = [];
+    window._bulkXlsxFile = null;
+    document.getElementById('bulk-file-input').value = '';
+    hideEl('bulk-preview-card');
+    hideEl('bulk-results-card');
+    hideEl('bulk-error');
+  }
+
+  async function runBulkCheck() {
+    const btn = document.getElementById('bulk-run-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Running…';
+    showEl('bulk-progress-container');
+    hideEl('bulk-results-card');
+    hideEl('bulk-error');
+
+    const fill = document.getElementById('bulk-progress-fill');
+    const ptext = document.getElementById('bulk-progress-text');
+    let fake = 0;
+    const iv = setInterval(() => {
+      fake = Math.min(fake + 2, 88);
+      fill.style.width = fake + '%';
+      ptext.textContent = `Checking rankings across all ASINs…`;
+    }, 500);
+
+    try {
+      const formData = new FormData();
+      // If xlsx file stored, use it; otherwise rebuild CSV from bulkEntries
+      if (window._bulkXlsxFile && bulkEntries[0]?._xlsxFile) {
+        formData.append('file', window._bulkXlsxFile);
+      } else {
+        const rows = [['ASIN','Marketplace','Search Term 1','Search Term 2','Search Term 3',
+                        'Search Term 4','Search Term 5','Search Term 6','Search Term 7','Search Term 8']];
+        bulkEntries.forEach(e => rows.push([e.asin, e.marketplace, ...e.terms]));
+        const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        formData.append('file', blob, 'bulk.csv');
+      }
+
+      const res = await fetch(`${API_BASE}/api/bulk-check`, { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Bulk check failed.');
+
+      clearInterval(iv);
+      fill.style.width = '100%';
+      ptext.textContent = 'Done!';
+      bulkResults = data.results;
+
+      setTimeout(() => {
+        hideEl('bulk-progress-container');
+        renderBulkResults(data.results);
+        showEl('bulk-results-card');
+        document.getElementById('bulk-results-card').scrollIntoView({ behavior: 'smooth' });
+      }, 400);
+
+    } catch (err) {
+      clearInterval(iv);
+      hideEl('bulk-progress-container');
+      showBulkError(err.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '🔍 Run Bulk Check';
+    }
+  }
+
+  function renderBulkResults(results) {
+    let totalTerms = 0, totalFound = 0, totalTop10 = 0;
+    results.forEach(r => {
+      totalTerms += r.rankings.length;
+      totalFound += r.rankings.filter(x => x.found).length;
+      totalTop10 += r.rankings.filter(x => x.found && x.position <= 10).length;
+    });
+
+    document.getElementById('bulk-summary-bar').innerHTML = `
+      <div class="summary-stat"><div class="val val-orange">${results.length}</div><div class="lbl">ASINs Checked</div></div>
+      <div class="summary-stat"><div class="val">${totalTerms}</div><div class="lbl">Total Searches</div></div>
+      <div class="summary-stat"><div class="val val-green">${totalFound}</div><div class="lbl">Terms Found</div></div>
+      <div class="summary-stat"><div class="val val-green">${totalTop10}</div><div class="lbl">Top 10 Rankings</div></div>
+    `;
+
+    document.getElementById('bulk-results-body').innerHTML = results.map((r, bi) => {
+      const found = r.rankings.filter(x => x.found).length;
+      const sorted = [...r.rankings].sort((a,b) => {
+        if (a.found && !b.found) return -1;
+        if (!a.found && b.found) return 1;
+        return (a.position||999) - (b.position||999);
+      });
+      const rows = sorted.map(x => {
+        let rankEl;
+        if (x.found) {
+          const cls = x.position <= 10 ? 'rank-top' : x.position <= 30 ? 'rank-mid' : 'rank-low';
+          rankEl = `<span class="rank-badge ${cls}">#${x.position}</span>`;
+        } else {
+          rankEl = `<span class="rank-badge rank-none">—</span>`;
+        }
+        return `<tr>
+          <td style="font-weight:500;padding-left:24px">${escHtml(x.term)}</td>
+          <td>${rankEl}</td>
+          <td>${x.found ? `<span class="page-badge">Page ${x.page}</span>` : '<span class="page-badge">—</span>'}</td>
+          <td>${x.found ? '<span style="color:var(--success);font-size:13px;">✓ Ranked</span>' : '<span style="color:var(--text-muted);font-size:13px;">Not found</span>'}</td>
+        </tr>`;
+      }).join('');
+
+      return `<div class="bulk-asin-block">
+        <div class="bulk-asin-header" onclick="toggleBulkBlock(${bi})">
+          <span class="asin-badge">${escHtml(r.asin)}</span>
+          <span class="bulk-asin-title">${escHtml(r.marketplace)}</span>
+          <span class="bulk-asin-meta">${found}/${r.rankings.length} terms found</span>
+          <span class="chevron" id="chev-${bi}">▼</span>
+        </div>
+        <div class="bulk-asin-body open" id="bulk-body-${bi}">
+          <table class="results-table">
+            <thead><tr><th>Search Term</th><th>Position</th><th>Page</th><th>Status</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function toggleBulkBlock(i) {
+    const body = document.getElementById(`bulk-body-${i}`);
+    const chev = document.getElementById(`chev-${i}`);
+    body.classList.toggle('open');
+    chev.classList.toggle('open');
+  }
+
+  function exportBulkCSV() {
+    if (!bulkResults.length) return;
+    const rows = [['ASIN','Marketplace','Search Term','Position','Page','Status']];
+    bulkResults.forEach(r => {
+      r.rankings.forEach(x => {
+        rows.push([r.asin, r.marketplace, `"${x.term}"`,
+          x.found ? x.position : '', x.found ? x.page : '',
+          x.found ? 'Ranked' : 'Not found']);
+      });
+    });
+    const csv = rows.map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `bulk-rankings-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  }
+
+  function downloadTemplate(type) {
+    if (type === 'csv') {
+      window.open(`${API_BASE}/api/template.csv`, '_blank');
+    } else {
+      window.open(`${API_BASE}/static/asin_rank_template.xlsx`, '_blank');
+    }
+  }
+
+  function showBulkError(msg) {
+    document.getElementById('bulk-error').textContent = '⚠ ' + msg;
+    showEl('bulk-error');
+  }
+</script>
+</body>
+</html>
