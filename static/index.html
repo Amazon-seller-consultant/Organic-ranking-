@@ -303,6 +303,257 @@
     /* Export button */
     .export-row { display: flex; justify-content: flex-end; margin-bottom: 14px; }
 
+    /* PPC Analysis cards */
+    .ppc-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+    .ppc-card-header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 18px; cursor: pointer;
+      transition: background 0.15s;
+    }
+    .ppc-card-header:hover { filter: brightness(1.06); }
+    .ppc-card.priority-high .ppc-card-header  { background: rgba(239,68,68,0.12); border-left: 3px solid var(--danger); }
+    .ppc-card.priority-medium .ppc-card-header { background: rgba(245,158,11,0.12); border-left: 3px solid var(--warn); }
+    .ppc-card.priority-low .ppc-card-header   { background: rgba(34,197,94,0.12);  border-left: 3px solid var(--success); }
+    .ppc-kw-name { flex: 1; font-weight: 700; font-size: 15px; }
+    .ppc-kw-meta { font-size: 12px; color: var(--text-muted); }
+    .priority-badge {
+      font-size: 11px; font-weight: 700;
+      padding: 3px 9px; border-radius: 20px;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .badge-high   { background: rgba(239,68,68,0.2);   color: #f87171; }
+    .badge-medium { background: rgba(245,158,11,0.2);  color: var(--warn); }
+    .badge-low    { background: rgba(34,197,94,0.2);   color: var(--success); }
+
+    .ppc-card-body { display: none; padding: 0 18px 18px; }
+    .ppc-card-body.open { display: block; }
+
+    .metrics-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 8px; margin: 14px 0 18px;
+    }
+    .metric-cell {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 12px;
+    }
+    .metric-cell .m-val { font-size: 16px; font-weight: 700; color: var(--text); }
+    .metric-cell .m-lbl { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+    .analysis-sections { display: flex; flex-direction: column; gap: 12px; }
+    .analysis-section {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 12px 14px;
+    }
+    .section-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.7px; color: var(--text-muted); margin-bottom: 5px;
+    }
+    .section-label.label-organic { color: #60a5fa; }
+    .section-label.label-traffic { color: #a78bfa; }
+    .section-label.label-conversion { color: #34d399; }
+    .section-label.label-ppc { color: var(--accent); }
+    .section-label.label-scaling { color: #fb923c; }
+    .section-label.label-listing { color: #f472b6; }
+    .section-label.label-wasted { color: #f87171; }
+    .section-label.label-momentum { color: #4ade80; }
+    .section-label.label-diagnosis { color: #c4b5fd; }
+    .section-label.label-action { color: var(--accent); }
+    .section-text { font-size: 13px; line-height: 1.6; color: var(--text); }
+
+    .diagnosis-box {
+      background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.25);
+      border-radius: var(--radius-sm); padding: 14px;
+    }
+    .action-box {
+      background: rgba(255,153,0,0.08); border: 1px solid rgba(255,153,0,0.3);
+      border-radius: var(--radius-sm); padding: 14px;
+    }
+
+    .ppc-controls {
+      display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;
+      margin-top: 16px;
+    }
+    .ppc-controls > div { display: flex; flex-direction: column; gap: 5px; }
+    .ppc-controls label { font-size: 12px; color: var(--text-muted); }
+    .ppc-controls input[type="number"] {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 9px 12px;
+      color: var(--text); font-size: 14px; outline: none; width: 120px;
+    }
+    .ppc-controls input[type="number"]:focus { border-color: var(--accent); }
+    .ppc-controls select { width: 160px; }
+
+    .ppc-filter-row {
+      display: flex; gap: 8px; align-items: center;
+      flex-wrap: wrap; margin-bottom: 12px;
+    }
+    .filter-chip {
+      padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border);
+      background: var(--surface2); color: var(--text-muted);
+      font-size: 12px; cursor: pointer; transition: all 0.15s;
+    }
+    .filter-chip.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+    /* PPC vs Organic cards */
+    .pvo-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 18px; overflow: hidden;
+    }
+    .pvo-card-header {
+      display: flex; align-items: center; gap: 14px;
+      padding: 14px 18px; cursor: pointer; transition: background 0.15s;
+    }
+    .pvo-card-header:hover { filter: brightness(1.07); }
+    .pvo-card.priority-high   .pvo-card-header { background: rgba(239,68,68,0.12);  border-left: 3px solid var(--danger); }
+    .pvo-card.priority-medium .pvo-card-header { background: rgba(245,158,11,0.12); border-left: 3px solid var(--warn); }
+    .pvo-card.priority-low    .pvo-card-header { background: rgba(34,197,94,0.12);  border-left: 3px solid var(--success); }
+    .pvo-kw-name { flex: 1; font-weight: 700; font-size: 15px; }
+
+    .organic-rank-badge {
+      display: inline-flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      width: 52px; height: 52px; border-radius: 10px;
+      font-weight: 800; font-size: 17px; flex-shrink: 0;
+    }
+    .rank-p1-strong { background: rgba(34,197,94,0.2);  color: var(--success); }
+    .rank-p1-lower  { background: rgba(245,158,11,0.2); color: var(--warn); }
+    .rank-p2-early  { background: rgba(99,102,241,0.2); color: #a78bfa; }
+    .rank-p2-weak   { background: rgba(239,68,68,0.15); color: #f87171; }
+    .rank-poor      { background: var(--surface2);       color: var(--text-muted); }
+    .rank-page-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; margin-top: 1px; }
+
+    .pvo-card-body { display: none; padding: 16px 18px 18px; }
+    .pvo-card-body.open { display: block; }
+
+    .match-type-table {
+      width: 100%; border-collapse: collapse;
+      font-size: 13px; margin: 14px 0;
+    }
+    .match-type-table th {
+      padding: 8px 12px; background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      text-align: left; font-size: 11px; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .match-type-table td {
+      padding: 9px 12px; border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    .match-type-table tr:last-child td { border-bottom: none; }
+    .match-type-table tr:hover td { background: rgba(255,255,255,0.02); }
+    .mt-name {
+      font-weight: 700; font-size: 12px;
+      padding: 3px 8px; border-radius: 4px; display: inline-block;
+    }
+    .mt-exact  { background: rgba(34,197,94,0.15);  color: var(--success); }
+    .mt-phrase { background: rgba(99,102,241,0.15); color: #a78bfa; }
+    .mt-broad  { background: rgba(245,158,11,0.15); color: var(--warn); }
+    .mt-product { background: rgba(239,68,68,0.15); color: #f87171; }
+    .mt-other  { background: var(--surface2); color: var(--text-muted); }
+    .best-mt-star { color: var(--accent); margin-left: 4px; font-size: 12px; }
+
+    .pvo-analysis-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 10px; margin-top: 14px;
+    }
+    @media (max-width: 640px) { .pvo-analysis-grid { grid-template-columns: 1fr; } }
+
+    .pvo-analysis-block {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 12px 14px;
+    }
+    .pvo-analysis-block.full-width { grid-column: 1 / -1; }
+    .pvo-block-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.6px; color: var(--text-muted); margin-bottom: 5px;
+    }
+    .pvo-block-text { font-size: 13px; line-height: 1.6; color: var(--text); }
+    .pvo-diagnosis-box {
+      background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.25);
+      border-radius: var(--radius-sm); padding: 14px; margin-top: 10px;
+      grid-column: 1 / -1;
+    }
+    .pvo-action-box {
+      background: rgba(255,153,0,0.08); border: 1px solid rgba(255,153,0,0.3);
+      border-radius: var(--radius-sm); padding: 14px; margin-top: 8px;
+    }
+
+    /* Ranking acceleration badge */
+    .accel-badge {
+      font-size: 10px; font-weight: 800; padding: 3px 9px;
+      border-radius: 20px; letter-spacing: 0.5px; text-transform: uppercase; flex-shrink: 0;
+    }
+    .accel-high   { background: rgba(34,197,94,0.2);  color: var(--success); border: 1px solid rgba(34,197,94,0.3); }
+    .accel-medium { background: rgba(245,158,11,0.2); color: var(--warn);    border: 1px solid rgba(245,158,11,0.3); }
+    .accel-low    { background: rgba(239,68,68,0.15); color: #f87171;        border: 1px solid rgba(239,68,68,0.25); }
+
+    /* Winning structure highlight */
+    .pvo-winner-box {
+      background: rgba(34,197,94,0.07); border: 1px solid rgba(34,197,94,0.25);
+      border-radius: var(--radius-sm); padding: 12px 14px;
+    }
+    /* Bottleneck box */
+    .pvo-bottleneck-box {
+      background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.2);
+      border-radius: var(--radius-sm); padding: 12px 14px;
+    }
+
+    .pvo-preview-table {
+      width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px;
+    }
+    .pvo-preview-table th {
+      text-align: left; padding: 8px 12px;
+      background: var(--surface2); border-bottom: 1px solid var(--border);
+      font-size: 11px; color: var(--text-muted); text-transform: uppercase;
+    }
+    .pvo-preview-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); }
+    .pvo-preview-table tr:last-child td { border-bottom: none; }
+    .mt-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+
+    /* ── Report Analysis Decision Table ─────────────────────────── */
+    .report-table {
+      width: 100%; border-collapse: collapse; font-size: 13px;
+      min-width: 1100px;
+    }
+    .report-table th {
+      padding: 10px 12px; background: var(--surface2); border-bottom: 2px solid var(--border);
+      text-align: left; font-size: 11px; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; position: sticky; top: 0;
+    }
+    .report-table td {
+      padding: 10px 12px; border-bottom: 1px solid var(--border);
+      vertical-align: middle; font-size: 13px;
+    }
+    .report-table tr:hover td { background: rgba(255,255,255,0.025); }
+    .report-table tr:last-child td { border-bottom: none; }
+    .bid-up   { color: var(--success); font-weight: 700; }
+    .bid-down { color: #f87171; font-weight: 700; }
+    .bid-flat { color: var(--text-muted); font-weight: 600; }
+    .action-badge {
+      display: inline-block; padding: 3px 8px; border-radius: 4px;
+      font-size: 11px; font-weight: 700; white-space: nowrap;
+    }
+    .action-scale  { background: rgba(34,197,94,0.2);  color: var(--success); }
+    .action-mod    { background: rgba(99,102,241,0.2);  color: #a78bfa; }
+    .action-hold   { background: rgba(245,158,11,0.15); color: var(--warn); }
+    .action-reduce { background: rgba(239,68,68,0.15);  color: #f87171; }
+    .action-list   { background: rgba(239,68,68,0.1);   color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+    .action-exact  { background: rgba(34,197,94,0.1);   color: var(--success); border: 1px solid rgba(34,197,94,0.3); }
+    .action-broad  { background: rgba(245,158,11,0.1);  color: var(--warn); border: 1px solid rgba(245,158,11,0.3); }
+    .report-stats-bar {
+      display: flex; gap: 20px; align-items: center;
+      flex-wrap: wrap; margin: 12px 0;
+    }
+    .report-stat { text-align: center; }
+    .report-stat .val { font-size: 22px; font-weight: 800; color: var(--accent); }
+    .report-stat .lbl { font-size: 11px; color: var(--text-muted); text-transform: uppercase; }
+
     /* Drop zone */
     .drop-zone {
       border: 2px dashed var(--border);
@@ -401,6 +652,7 @@
   <div class="mode-tabs">
     <button class="mode-tab active" id="tab-single" onclick="switchMode('single')">🔍 Single ASIN</button>
     <button class="mode-tab" id="tab-bulk" onclick="switchMode('bulk')">📂 Bulk Upload</button>
+    <button class="mode-tab" id="tab-report" onclick="switchMode('report')">📊 Ads Analyzer</button>
   </div>
 
   <!-- Single ASIN mode wrapper -->
@@ -542,22 +794,54 @@
 
     <!-- Upload card -->
     <div class="card">
-      <div class="card-title">Upload ASIN + Search Terms File</div>
+      <div class="card-title">Upload Files</div>
 
-      <div class="drop-zone" id="drop-zone" onclick="document.getElementById('bulk-file-input').click()"
-        ondragover="event.preventDefault(); this.classList.add('drag-over')"
-        ondragleave="this.classList.remove('drag-over')"
-        ondrop="handleDrop(event)">
-        <input type="file" id="bulk-file-input" accept=".csv,.xlsx" onchange="handleFileSelect(event)" />
-        <div class="drop-zone-icon">📄</div>
-        <h3>Drop your CSV or Excel file here</h3>
-        <p>or click to browse &nbsp;·&nbsp; .csv and .xlsx supported</p>
-      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
 
-      <div class="template-row">
-        <span>Don't have a file yet? Download a template:</span>
-        <button class="btn btn-secondary" onclick="downloadTemplate('xlsx')">⬇ Excel Template (.xlsx)</button>
-        <button class="btn btn-secondary" onclick="downloadTemplate('csv')">⬇ CSV Template (.csv)</button>
+        <!-- Zone 1: Ranking file (required) -->
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:8px;">
+            1. ASIN &amp; Search Terms
+            <span style="color:var(--danger);font-weight:400;font-size:12px;"> required</span>
+          </div>
+          <div class="drop-zone" id="drop-zone"
+            onclick="document.getElementById('bulk-file-input').click()"
+            ondragover="event.preventDefault();this.classList.add('drag-over')"
+            ondragleave="this.classList.remove('drag-over')"
+            ondrop="handleDrop(event)" style="padding:28px 16px;">
+            <input type="file" id="bulk-file-input" accept=".csv,.xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12" onchange="handleFileSelect(event)" />
+            <div class="drop-zone-icon" style="font-size:28px;margin-bottom:8px;">📄</div>
+            <h3 style="font-size:14px;">Drop CSV or Excel here</h3>
+            <p style="font-size:12px;">.csv and .xlsx supported</p>
+          </div>
+          <div class="template-row" style="margin-top:10px;">
+            <button class="btn btn-secondary" style="font-size:12px;padding:7px 12px;" onclick="downloadTemplate('xlsx')">⬇ Excel Template</button>
+            <button class="btn btn-secondary" style="font-size:12px;padding:7px 12px;" onclick="downloadTemplate('csv')">⬇ CSV Template</button>
+          </div>
+          <p style="font-size:11px;color:var(--text-muted);line-height:1.5;margin-top:8px;">
+            In the Codex in-app browser, downloads may be blocked. The templates are already saved at
+            <code>static/asin_rank_template.xlsx</code> and <code>static/asin_rank_template.csv</code>.
+          </p>
+        </div>
+
+        <!-- Zone 2: Amazon Ads report (optional) -->
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:8px;">
+            2. Amazon Ads Target/Search Term Report
+            <span style="color:var(--text-muted);font-weight:400;font-size:12px;"> optional — adds PPC vs Organic analysis</span>
+          </div>
+          <div class="drop-zone" id="bulk-ads-zone"
+            onclick="document.getElementById('bulk-ads-input').click()"
+            ondragover="event.preventDefault();this.classList.add('drag-over')"
+            ondragleave="this.classList.remove('drag-over')"
+            ondrop="handleBulkAdsDrop(event)" style="padding:28px 16px;">
+            <input type="file" id="bulk-ads-input" accept=".csv" onchange="handleBulkAdsFile(event)" />
+            <div class="drop-zone-icon" style="font-size:28px;margin-bottom:8px;" id="bulk-ads-icon">📊</div>
+            <h3 style="font-size:14px;" id="bulk-ads-title">Drop Amazon Target/Search Term CSV</h3>
+            <p style="font-size:12px;" id="bulk-ads-sub">Optional PPC vs Organic comparison · .csv only</p>
+          </div>
+          <div id="bulk-ads-status" class="status-msg status-info hidden" style="margin-top:10px;font-size:12px;"></div>
+        </div>
       </div>
     </div>
 
@@ -570,41 +854,393 @@
       <div style="overflow-x:auto;">
         <table class="preview-table">
           <thead>
-            <tr>
-              <th>ASIN</th>
-              <th>Marketplace</th>
-              <th>Search Terms</th>
-              <th></th>
-            </tr>
+            <tr><th>ASIN</th><th>Marketplace</th><th>Search Terms</th><th></th></tr>
           </thead>
           <tbody id="bulk-preview-body"></tbody>
         </table>
       </div>
-      <div style="margin-top:18px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+
+      <!-- Ads report info row (shown when ads report is loaded) -->
+      <div id="bulk-ads-info-row" class="hidden" style="margin-top:16px;padding:12px 14px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.25);border-radius:var(--radius-sm);display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+        <span style="font-size:13px;color:#a78bfa;">⚔️ PPC vs Organic analysis enabled</span>
+        <span id="bulk-ads-info-text" style="font-size:13px;color:var(--text-muted);"></span>
+        <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
+          <label style="font-size:12px;color:var(--text-muted);">Target ACoS (%):</label>
+          <input type="number" id="bulk-target-acos" placeholder="e.g. 25" min="1" max="200" step="0.1"
+            style="width:90px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px;color:var(--text);font-size:13px;outline:none;" />
+        </div>
+        <button class="btn btn-danger" style="font-size:12px;padding:5px 10px;" onclick="clearBulkAds()">Remove report</button>
+      </div>
+
+      <div style="margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
         <button class="btn btn-primary btn-lg" id="bulk-run-btn" onclick="runBulkCheck()">
-          🔍 Run Bulk Check
+          🔍 Check Rankings
         </button>
-        <button class="btn btn-secondary" onclick="clearBulk()">Clear</button>
+        <button class="btn btn-secondary" onclick="clearBulk()">Clear All</button>
         <span id="bulk-count-label" style="font-size:13px;color:var(--text-muted);"></span>
       </div>
       <div id="bulk-progress-container" class="hidden" style="margin-top:16px;">
         <div class="progress-bar"><div class="progress-fill" id="bulk-progress-fill" style="width:0%"></div></div>
-        <div class="progress-text" id="bulk-progress-text">Running bulk check…</div>
+        <div class="progress-text" id="bulk-progress-text">Checking rankings…</div>
       </div>
       <div id="bulk-error" class="status-msg status-error hidden"></div>
     </div>
 
     <!-- Bulk results card -->
     <div class="card hidden" id="bulk-results-card">
-      <div class="card-title">Bulk Ranking Results</div>
+      <div class="card-title" id="bulk-results-title">Bulk Ranking Results</div>
       <div class="summary-bar" id="bulk-summary-bar"></div>
-      <div class="export-row">
-        <button class="btn btn-secondary" onclick="exportBulkCSV()">⬇ Export All as CSV</button>
+      <div class="export-row" id="bulk-export-row">
+        <button class="btn btn-secondary" onclick="exportBulkCSV()">⬇ Export Rankings CSV</button>
+        <button class="btn btn-secondary hidden" id="bulk-pvo-export-btn" onclick="exportBulkPVOCSV()">⬇ Export PPC Analysis CSV</button>
       </div>
       <div id="bulk-results-body"></div>
+
+      <!-- PPC vs Organic results section -->
+      <div id="bulk-pvo-section" class="hidden" style="margin-top:8px;">
+        <div style="border-top:1px solid var(--border);margin:20px 0 16px;"></div>
+        <div style="font-size:16px;font-weight:700;margin-bottom:6px;">⚔️ PPC vs Organic Analysis</div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;" id="bulk-pvo-desc"></p>
+        <div class="summary-bar" id="bulk-pvo-summary-bar" style="margin-bottom:16px;"></div>
+        <div id="bulk-pvo-results-body"></div>
+      </div>
     </div>
 
   </div><!-- end mode-bulk -->
+
+  <!-- ── Report Analysis Mode ─────────────────────────────────── -->
+  <div id="mode-report" class="hidden">
+
+    <!-- Upload card -->
+    <div class="card">
+      <div style="margin-bottom:18px">
+        <div class="card-title">📊 Amazon Ads Opportunity Analyzer</div>
+        <div style="font-size:13px;color:var(--text-muted);margin-top:4px">
+          Upload your ASIN & Search Terms filter file + full Amazon Sponsored Products workbook to compare campaigns, ad groups, match types, placements, and organic rank.
+        </div>
+      </div>
+
+      <div class="two-col-upload">
+        <!-- Left: ASIN & Search Terms filter -->
+        <div class="upload-col">
+          <div class="upload-col-header">
+            <span class="upload-col-num">1</span>
+            <div>
+              <div class="upload-col-title">ASIN & Search Terms</div>
+              <div class="upload-col-sub">CSV or XLSX · same format as Bulk Upload template</div>
+            </div>
+          </div>
+          <div class="drop-zone" id="report-filter-zone"
+               ondragover="event.preventDefault();this.classList.add('drag-over')"
+               ondragleave="this.classList.remove('drag-over')"
+               ondrop="handleReportFilterDrop(event)"
+               onclick="document.getElementById('report-filter-input').click()">
+            <span id="report-filter-icon" style="font-size:32px">📋</span>
+            <div id="report-filter-title" style="font-weight:700;margin-top:8px">Drop ASIN & Search Terms File</div>
+            <div id="report-filter-sub" style="font-size:12px;color:var(--text-muted);margin-top:4px">CSV or XLSX · Click to browse</div>
+            <input type="file" id="report-filter-input" accept=".csv,.xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12" style="display:none" onchange="handleReportFilterFile(event)">
+          </div>
+          <div id="report-filter-status" class="status-msg hidden" style="margin-top:8px"></div>
+          <button class="btn btn-secondary" style="margin-top:8px;font-size:12px" onclick="downloadTemplate('csv')">⬇ Download Template</button>
+        </div>
+
+        <!-- Right: Merged Amazon Ad Report -->
+        <div class="upload-col">
+          <div class="upload-col-header">
+            <span class="upload-col-num">2</span>
+            <div>
+              <div class="upload-col-title">Full Amazon Ads Workbook</div>
+              <div class="upload-col-sub">XLSX · Advertised Product, Search Term, Targeting, Placement sheets</div>
+            </div>
+          </div>
+          <div class="drop-zone" id="report-ads-zone"
+               ondragover="event.preventDefault();this.classList.add('drag-over')"
+               ondragleave="this.classList.remove('drag-over')"
+               ondrop="handleReportAdsDrop(event)"
+               onclick="document.getElementById('report-ads-input').click()">
+            <span id="report-ads-icon" style="font-size:32px">📊</span>
+            <div id="report-ads-title" style="font-weight:700;margin-top:8px">Drop Full Amazon Ads Report XLSX</div>
+            <div id="report-ads-sub" style="font-size:12px;color:var(--text-muted);margin-top:4px">Uses Search Term, Targeting, Placement, and Advertised Product tabs</div>
+            <input type="file" id="report-ads-input" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12" style="display:none" onchange="handleReportAdsFile(event)">
+          </div>
+          <div id="report-ads-status" class="status-msg hidden" style="margin-top:8px"></div>
+        </div>
+      </div>
+
+      <!-- Target ACoS + Run button -->
+      <div style="display:flex;align-items:flex-end;gap:20px;margin-top:20px;flex-wrap:wrap">
+        <div>
+          <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:5px">Target ACoS (%)</label>
+          <input type="number" id="report-target-acos" value="20" min="1" max="500" step="1"
+                 style="width:100px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px">
+        </div>
+        <button class="btn btn-primary" id="report-run-btn" onclick="runReportAnalysis()" disabled
+                style="height:40px">
+          📊 Analyze Campaign Opportunities
+        </button>
+        <button class="btn btn-secondary" onclick="clearReport()" style="height:40px">✕ Clear</button>
+      </div>
+
+      <div id="report-error" class="error-msg hidden" style="margin-top:12px"></div>
+    </div>
+
+    <!-- Progress -->
+    <div id="report-progress-container" class="hidden" style="margin-top:16px">
+      <div class="card" style="padding:20px">
+        <div id="report-progress-text" style="font-size:13px;color:var(--text-muted);margin-bottom:10px">Checking rankings…</div>
+        <div style="background:var(--surface2);border-radius:99px;height:6px;overflow:hidden">
+          <div id="report-progress-fill" style="height:100%;background:var(--accent);border-radius:99px;width:0%;transition:width 0.4s ease"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results: decision table -->
+    <div class="card hidden" id="report-results-card" style="margin-top:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+        <h2 style="font-size:18px;font-weight:800">Campaign Opportunity Table</h2>
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-secondary" onclick="exportReportCSV()">⬇ Export CSV</button>
+        </div>
+      </div>
+      <div id="report-export-status" class="status-msg status-info hidden" style="margin-bottom:12px"></div>
+      <div id="report-summary-body" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-bottom:14px"></div>
+      <div class="report-stats-bar" id="report-stats-bar"></div>
+      <div style="overflow-x:auto;margin-top:8px">
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th>ASIN</th>
+              <th>Keyword</th>
+              <th>Organic Rank</th>
+              <th>Amazon Page</th>
+              <th>Campaign Name</th>
+              <th>Ad Group</th>
+              <th>Match Type</th>
+              <th>Source</th>
+              <th>CTR</th>
+              <th>CVR</th>
+              <th>ACoS</th>
+              <th>Top of Search</th>
+              <th>Target ACoS</th>
+              <th>Bid Change</th>
+              <th>Action</th>
+              <th>Reason</th>
+            </tr>
+          </thead>
+          <tbody id="report-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- end mode-report -->
+
+  <!-- (PPC Analysis and PPC vs Organic moved inside Bulk Upload) -->
+  <div id="mode-ppc" class="hidden">
+
+    <!-- Upload card -->
+    <div class="card">
+      <div class="card-title">Upload Amazon Target / Search Term Report
+        <span class="badge">Step 1</span>
+      </div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">
+        Export your Search Term Report or Targeting Report from Amazon Advertising Console as CSV. The tool filters active keywords, sorts by spend, and sends the top keywords to Claude for expert PPC analysis.
+      </p>
+
+      <div class="drop-zone" id="ppc-drop-zone"
+        onclick="document.getElementById('ppc-file-input').click()"
+        ondragover="event.preventDefault(); this.classList.add('drag-over')"
+        ondragleave="this.classList.remove('drag-over')"
+        ondrop="handlePPCDrop(event)">
+        <input type="file" id="ppc-file-input" accept=".csv" onchange="handlePPCFile(event)" />
+        <div class="drop-zone-icon">📊</div>
+        <h3>Drop your Amazon Target Report CSV here</h3>
+        <p>or click to browse &nbsp;·&nbsp; .csv only</p>
+      </div>
+    </div>
+
+    <!-- Config + preview card -->
+    <div class="card hidden" id="ppc-config-card">
+      <div class="card-title">Configure Analysis
+        <span class="badge">Step 2</span>
+      </div>
+
+      <div class="ppc-controls">
+        <div>
+          <label>Target ACoS (%)</label>
+          <input type="number" id="ppc-target-acos" placeholder="e.g. 25" min="1" max="200" step="0.1" />
+        </div>
+        <div>
+          <label>Keywords to analyze</label>
+          <select id="ppc-top-n">
+            <option value="10">Top 10 by spend</option>
+            <option value="20" selected>Top 20 by spend</option>
+            <option value="30">Top 30 by spend</option>
+          </select>
+        </div>
+        <div>
+          <label>Filter</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;padding-top:2px;">
+            <span class="filter-chip active" id="chip-active" onclick="toggleChip('active')">Active only</span>
+            <span class="filter-chip active" id="chip-spend" onclick="toggleChip('spend')">Has spend</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="ppc-preview-stats" style="margin:16px 0;font-size:13px;color:var(--text-muted);"></div>
+
+      <div style="overflow-x:auto;">
+        <table class="preview-table" id="ppc-preview-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Keyword</th>
+              <th>Match</th>
+              <th>Impressions</th>
+              <th>CTR</th>
+              <th>CVR</th>
+              <th>Spend</th>
+              <th>ACoS</th>
+              <th>Orders</th>
+              <th>Organic Rank</th>
+            </tr>
+          </thead>
+          <tbody id="ppc-preview-body"></tbody>
+        </table>
+      </div>
+
+      <div style="margin-top:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <button class="btn btn-ai btn-lg" id="ppc-analyze-btn" onclick="runPPCAnalysis()">
+          🧠 Analyze with AI
+        </button>
+        <button class="btn btn-secondary" onclick="clearPPC()">Clear</button>
+        <span id="ppc-kw-count" style="font-size:13px;color:var(--text-muted);"></span>
+      </div>
+
+      <div id="ppc-progress-container" class="hidden" style="margin-top:16px;">
+        <div class="progress-bar"><div class="progress-fill" id="ppc-progress-fill" style="width:0%"></div></div>
+        <div class="progress-text" id="ppc-progress-text">Claude is analyzing your PPC data…</div>
+      </div>
+      <div id="ppc-error" class="status-msg status-error hidden"></div>
+    </div>
+
+    <!-- Results card -->
+    <div class="card hidden" id="ppc-results-card">
+      <div class="card-title">PPC Analysis Results
+        <span class="badge">Step 3</span>
+      </div>
+      <div class="summary-bar" id="ppc-summary-bar"></div>
+      <div class="export-row">
+        <button class="btn btn-secondary" onclick="exportPPCCSV()">⬇ Export Summary CSV</button>
+      </div>
+      <div id="ppc-results-body"></div>
+    </div>
+
+  </div><!-- end mode-ppc -->
+
+  <!-- PPC vs Organic mode -->
+  <div id="mode-pvo" class="hidden">
+
+    <!-- Step 1: Organic rank source -->
+    <div class="card" id="pvo-step1-card">
+      <div class="card-title">Step 1 — Organic Rank Data</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">
+        This tool only analyzes keywords you have already checked in the rank tracker. Import from the Single ASIN tab or upload a rank export CSV.
+      </p>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-primary" id="pvo-import-btn" onclick="pvoImportFromTracker()">
+          ↩ Import from Single ASIN Tab
+        </button>
+        <button class="btn btn-secondary" onclick="document.getElementById('pvo-rank-file').click()">
+          📄 Upload Rank Export CSV
+        </button>
+        <input type="file" id="pvo-rank-file" accept=".csv" class="hidden" onchange="pvoLoadRankCSV(event)" />
+      </div>
+
+      <div id="pvo-rank-status" class="status-msg status-info hidden" style="margin-top:12px;"></div>
+    </div>
+
+    <!-- Step 2: PPC report -->
+    <div class="card hidden" id="pvo-step2-card">
+      <div class="card-title">Step 2 — PPC Target Report</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">
+        Upload your Amazon Target Report CSV. The tool will automatically match keywords that exist in both your organic rank data and the PPC report.
+      </p>
+
+      <div class="drop-zone" id="pvo-drop-zone"
+        onclick="document.getElementById('pvo-ppc-file').click()"
+        ondragover="event.preventDefault();this.classList.add('drag-over')"
+        ondragleave="this.classList.remove('drag-over')"
+        ondrop="pvoPPCDrop(event)">
+        <input type="file" id="pvo-ppc-file" accept=".csv" onchange="pvoLoadPPCCSV(event)" />
+        <div class="drop-zone-icon">📊</div>
+        <h3>Drop your Amazon Target Report CSV here</h3>
+        <p>or click to browse</p>
+      </div>
+      <div id="pvo-ppc-status" class="status-msg status-error hidden" style="margin-top:12px;"></div>
+    </div>
+
+    <!-- Step 3: Matched keywords preview + config -->
+    <div class="card hidden" id="pvo-step3-card">
+      <div class="card-title">Step 3 — Matched Keywords
+        <span class="badge" id="pvo-match-badge">0 matched</span>
+      </div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:4px;">
+        These keywords appear in both your organic rank data and PPC report. Remove any you don't want to analyze.
+      </p>
+
+      <div style="overflow-x:auto;">
+        <table class="pvo-preview-table">
+          <thead>
+            <tr>
+              <th>Keyword</th>
+              <th>Organic Rank</th>
+              <th>Page</th>
+              <th>Match Types in PPC</th>
+              <th>Total Spend</th>
+              <th>Total Orders</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="pvo-preview-body"></tbody>
+        </table>
+      </div>
+
+      <div style="margin-top:18px;display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+        <div>
+          <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:5px;">Target ACoS (%)</label>
+          <input type="number" id="pvo-target-acos" placeholder="e.g. 25" min="1" max="200" step="0.1"
+            style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 12px;color:var(--text);font-size:14px;outline:none;width:120px;" />
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:5px;">ASIN</label>
+          <input type="text" id="pvo-asin" placeholder="Auto-filled or type ASIN"
+            style="width:160px;" />
+        </div>
+        <button class="btn btn-ai btn-lg" id="pvo-analyze-btn" onclick="runPVOAnalysis()">
+          ⚔️ Compare &amp; Analyze
+        </button>
+        <button class="btn btn-secondary" onclick="clearPVO()">Reset</button>
+      </div>
+
+      <div id="pvo-progress-container" class="hidden" style="margin-top:16px;">
+        <div class="progress-bar"><div class="progress-fill" id="pvo-progress-fill" style="width:0%"></div></div>
+        <div class="progress-text" id="pvo-progress-text">Comparing PPC vs organic rank…</div>
+      </div>
+      <div id="pvo-error" class="status-msg status-error hidden"></div>
+    </div>
+
+    <!-- Results -->
+    <div class="card hidden" id="pvo-results-card">
+      <div class="card-title">PPC vs Organic Analysis Results</div>
+      <div class="summary-bar" id="pvo-summary-bar"></div>
+      <div class="export-row">
+        <button class="btn btn-secondary" onclick="exportPVOCSV()">⬇ Export Summary CSV</button>
+      </div>
+      <div id="pvo-results-body"></div>
+    </div>
+
+  </div><!-- end mode-pvo -->
 
 </div>
 
@@ -930,16 +1566,11 @@
 
   // ── Bulk Upload ─────────────────────────────────────────────
 
-  let bulkEntries = []; // [{ asin, marketplace, terms[] }]
-  let bulkResults = [];
+  let bulkEntries    = []; // [{ asin, marketplace, terms[] }]
+  let bulkResults    = [];
+  let bulkAdsRows    = []; // parsed PPC/Target Report rows
+  let bulkPVOResults = [];
 
-  function switchMode(mode) {
-    const isSingle = mode === 'single';
-    document.getElementById('mode-single').classList.toggle('hidden', !isSingle);
-    document.getElementById('mode-bulk').classList.toggle('hidden', isSingle);
-    document.getElementById('tab-single').classList.toggle('active', isSingle);
-    document.getElementById('tab-bulk').classList.toggle('active', !isSingle);
-  }
 
   function handleDrop(e) {
     e.preventDefault();
@@ -1007,6 +1638,41 @@
     return result.map(s => s.replace(/^"|"$/g, '').trim());
   }
 
+  function findAdsHeader(lines) {
+    for (let i = 0; i < Math.min(lines.length, 12); i++) {
+      const header = parseCSVLine(lines[i]).map(h => h.replace(/^﻿/, '').toLowerCase().trim());
+      const hasQuery = header.some(h =>
+        h === 'search query' ||
+        h === 'customer search term' ||
+        h === 'search term' ||
+        h === 'target' ||
+        h === 'keyword'
+      );
+      const hasMetric = header.some(h =>
+        h.includes('impressions') ||
+        h.includes('click') ||
+        h.includes('spend') ||
+        h.includes('purchases')
+      );
+      if (hasQuery && hasMetric) return { index: i, header };
+    }
+    return null;
+  }
+
+  function extractMetadataAsin(lines) {
+    for (const line of lines.slice(0, 5)) {
+      const match = line.match(/ASIN=\["?([A-Z0-9]{10})"?\]/i);
+      if (match) return match[1].toUpperCase();
+    }
+    return '';
+  }
+
+  function rateValue(v) {
+    const n = parseFloat(v);
+    if (isNaN(n)) return 0;
+    return n > 1 ? n / 100 : n;
+  }
+
   async function sendForPreview(file) {
     // Upload the xlsx file to bulk-check with a parse-only flag isn't available,
     // so we use a lightweight parse by uploading and getting the preview back.
@@ -1057,16 +1723,188 @@
     renderBulkPreview('file');
   }
 
+  // ── Bulk ads report handling ────────────────────────────────
+
+  function handleBulkAdsDrop(e) {
+    e.preventDefault();
+    document.getElementById('bulk-ads-zone').classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) parseBulkAdsFile(file);
+  }
+  function handleBulkAdsFile(e) {
+    const file = e.target.files[0];
+    if (file) parseBulkAdsFile(file);
+  }
+
+  function parseBulkAdsFile(file) {
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      alert('Please upload a .csv file for the Ads report.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const lines = ev.target.result.split(/\r?\n/).filter(l => l.trim());
+      if (lines.length < 2) return;
+
+      const headerInfo = findAdsHeader(lines);
+      if (!headerInfo) {
+        alert('Could not find a Search Query, Customer Search Term, Target, or Keyword column.');
+        return;
+      }
+      const header = headerInfo.header;
+      const colAny = (...names) => {
+        for (const name of names) {
+          const exact = header.indexOf(name);
+          if (exact >= 0) return exact;
+        }
+        for (const name of names) {
+          const fuzzy = header.findIndex(h => h.includes(name));
+          if (fuzzy >= 0) return fuzzy;
+        }
+        return -1;
+      };
+      const idx = {
+        query:       colAny('customer search term', 'search query', 'search term', 'query'),
+        target:      colAny('target', 'keyword'),
+        matchType:   colAny('targeting type', 'match type'),
+        campaign:    colAny('campaign name', 'campaign'),
+        adGroup:     colAny('ad group name', 'ad group'),
+        impressions: colAny('impressions: asin count', 'impressions', 'impressions: total count'),
+        tosIs:       colAny('top-of-search is', 'top-of-search impression share'),
+        clicks:      colAny('clicks: asin count', 'clicks', 'clicks: total count'),
+        spend:       colAny('spend', 'cost'),
+        ctr:         colAny('clicks: click rate %', 'ctr', 'click-thru rate'),
+        orders:      colAny('purchases: asin count', 'orders', '7 day total orders'),
+        cvr:         colAny('purchases: purchase rate %', 'conversion rate', 'cvr'),
+        sales:       colAny('sales', '7 day total sales'),
+        acos:        colAny('acos', 'advertising cost of sales'),
+        cpc:         colAny('cpc', 'cost per click'),
+        roas:        colAny('roas', 'return on advertising spend'),
+      };
+      if (idx.query === -1 && idx.target === -1) {
+        alert('Could not find a Search Query, Customer Search Term, Target, or Keyword column.');
+        return;
+      }
+
+      bulkAdsRows = [];
+      for (let i = headerInfo.index + 1; i < lines.length; i++) {
+        const cols = parseCSVLine(lines[i]);
+        if (!cols || cols.length < 5) continue;
+        const g  = j => (j >= 0 && cols[j] != null ? cols[j] : '').trim();
+        const gf = j => { const v = parseFloat(g(j)); return isNaN(v) ? null : v; };
+        const keyword = g(idx.query) || g(idx.target);
+        if (!keyword) continue;
+        bulkAdsRows.push({
+          keyword,
+          match_type:      g(idx.matchType),
+          campaign:        g(idx.campaign),
+          ad_group:        g(idx.adGroup),
+          impressions:     gf(idx.impressions) || 0,
+          top_of_search_is: gf(idx.tosIs),
+          clicks:          gf(idx.clicks) || 0,
+          spend:           gf(idx.spend) || 0,
+          ctr:             rateValue(g(idx.ctr)),
+          orders:          gf(idx.orders) || 0,
+          cvr:             rateValue(g(idx.cvr)) * 100,
+          sales:           gf(idx.sales) || 0,
+          acos:            gf(idx.acos),
+          cpc:             gf(idx.cpc) || 0,
+          roas:            gf(idx.roas),
+        });
+      }
+
+      // Update UI
+      document.getElementById('bulk-ads-icon').textContent = '✅';
+      document.getElementById('bulk-ads-title').textContent = file.name;
+      document.getElementById('bulk-ads-sub').textContent = `${bulkAdsRows.length.toLocaleString()} search queries loaded`;
+      document.getElementById('bulk-ads-status').textContent =
+        `✓ Ads report loaded — ${bulkAdsRows.length.toLocaleString()} search queries/keywords. PPC vs Organic analysis will run after ranking check.`;
+      document.getElementById('bulk-ads-status').className = 'status-msg status-info';
+      showEl('bulk-ads-status');
+
+      // Show info row in preview card if already visible
+      if (!document.getElementById('bulk-preview-card').classList.contains('hidden')) {
+        showEl('bulk-ads-info-row');
+        document.getElementById('bulk-ads-info-text').textContent =
+          `${bulkAdsRows.length.toLocaleString()} PPC search queries/keywords loaded from ${file.name}`;
+        document.getElementById('bulk-run-btn').textContent = '🔍 Check Rankings + PPC vs Organic';
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function clearBulkAds() {
+    bulkAdsRows = []; bulkPVOResults = [];
+    document.getElementById('bulk-ads-input').value = '';
+    document.getElementById('bulk-ads-icon').textContent = '📊';
+    document.getElementById('bulk-ads-title').textContent = 'Drop Amazon Target/Search Term CSV';
+    document.getElementById('bulk-ads-sub').textContent = 'Optional PPC vs Organic comparison · .csv only';
+    hideEl('bulk-ads-status');
+    hideEl('bulk-ads-info-row');
+    document.getElementById('bulk-run-btn').textContent = '🔍 Check Rankings';
+  }
+
   function clearBulk() {
-    bulkEntries = []; bulkResults = [];
+    bulkEntries = []; bulkResults = []; bulkAdsRows = []; bulkPVOResults = [];
     window._bulkXlsxFile = null;
     document.getElementById('bulk-file-input').value = '';
+    clearBulkAds();
     hideEl('bulk-preview-card');
     hideEl('bulk-results-card');
     hideEl('bulk-error');
   }
 
+  // Helper: match ranked keywords against ads rows and build PVO keyword list.
+  // Groups by campaign + ad_group + match_type so the AI can compare individual campaign structures.
+  function buildPVOKeywords(rankingResults) {
+    const matched = [];
+    for (const asinResult of rankingResults) {
+      for (const kw of asinResult.rankings.filter(r => r.found)) {
+        const term = kw.term.toLowerCase().trim();
+        const rows = bulkAdsRows.filter(r => r.keyword.toLowerCase().trim() === term);
+        if (!rows.length) continue;
+
+        // Group by campaign + ad_group + match_type (each combination = one row for AI)
+        const byKey = {};
+        rows.forEach(r => {
+          const key = `${r.campaign}|||${r.ad_group || ''}|||${r.match_type || 'Unknown'}`;
+          if (!byKey[key]) byKey[key] = [];
+          byKey[key].push(r);
+        });
+
+        const ppc_rows = Object.entries(byKey).map(([key, rs]) => {
+          const [campaign, ad_group, match_type] = key.split('|||');
+          const totalImpr   = rs.reduce((s, r) => s + r.impressions, 0);
+          const totalClicks = rs.reduce((s, r) => s + r.clicks, 0);
+          const totalSpend  = rs.reduce((s, r) => s + r.spend, 0);
+          const totalOrders = rs.reduce((s, r) => s + r.orders, 0);
+          const totalSales  = rs.reduce((s, r) => s + r.sales, 0);
+          return {
+            match_type,
+            campaign,
+            ad_group: ad_group || null,
+            impressions: totalImpr,
+            clicks:      totalClicks,
+            ctr:         totalImpr   > 0 ? totalClicks / totalImpr   : 0,
+            cpc:         totalClicks > 0 ? totalSpend  / totalClicks : 0,
+            spend:       totalSpend,
+            orders:      totalOrders,
+            sales:       totalSales,
+            cvr:         totalClicks > 0 ? (totalOrders / totalClicks) * 100 : 0,
+            acos:        totalSales  > 0 ? totalSpend  / totalSales  : null,
+            roas:        totalSpend  > 0 ? totalSales  / totalSpend  : null,
+            top_of_search_is: rs.find(r => r.top_of_search_is != null)?.top_of_search_is ?? null,
+          };
+        });
+
+        matched.push({ keyword: kw.term, organic_rank: kw.position, ppc_rows, _asin: asinResult.asin });
+      }
+    }
+    return matched;
+  }
+
   async function runBulkCheck() {
+    const hasAds = bulkAdsRows.length > 0;
     const btn = document.getElementById('bulk-run-btn');
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span> Running…';
@@ -1074,18 +1912,18 @@
     hideEl('bulk-results-card');
     hideEl('bulk-error');
 
-    const fill = document.getElementById('bulk-progress-fill');
+    const fill  = document.getElementById('bulk-progress-fill');
     const ptext = document.getElementById('bulk-progress-text');
     let fake = 0;
     const iv = setInterval(() => {
-      fake = Math.min(fake + 2, 88);
+      fake = Math.min(fake + 2, hasAds ? 55 : 88);
       fill.style.width = fake + '%';
-      ptext.textContent = `Checking rankings across all ASINs…`;
+      ptext.textContent = 'Checking rankings across all ASINs…';
     }, 500);
 
     try {
+      // ── Step 1: Rankings ──────────────────────────────────────
       const formData = new FormData();
-      // If xlsx file stored, use it; otherwise rebuild CSV from bulkEntries
       if (window._bulkXlsxFile && bulkEntries[0]?._xlsxFile) {
         formData.append('file', window._bulkXlsxFile);
       } else {
@@ -1093,22 +1931,66 @@
                         'Search Term 4','Search Term 5','Search Term 6','Search Term 7','Search Term 8']];
         bulkEntries.forEach(e => rows.push([e.asin, e.marketplace, ...e.terms]));
         const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
-        const blob = new Blob([csv], { type: 'text/csv' });
-        formData.append('file', blob, 'bulk.csv');
+        formData.append('file', new Blob([csv], { type: 'text/csv' }), 'bulk.csv');
       }
 
       const res = await fetch(`${API_BASE}/api/bulk-check`, { method: 'POST', body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Bulk check failed.');
-
       clearInterval(iv);
+      bulkResults = data.results;
+
+      // ── Step 2: PPC vs Organic (if ads report loaded) ─────────
+      bulkPVOResults = [];
+      if (hasAds) {
+        fill.style.width = '60%';
+        ptext.textContent = 'Matching PPC keywords with ranking data…';
+
+        const matchedKws = buildPVOKeywords(bulkResults);
+
+        if (matchedKws.length > 0) {
+          ptext.textContent = `Running PPC vs Organic analysis for ${matchedKws.length} matched keyword${matchedKws.length > 1 ? 's' : ''}…`;
+          const targetAcos = parseFloat(document.getElementById('bulk-target-acos').value) || null;
+          const asins = [...new Set(matchedKws.map(k => k._asin))].join(', ');
+
+          // Fake progress for PPC analysis
+          let pvcFake = 60;
+          const pvcIv = setInterval(() => {
+            pvcFake = Math.min(pvcFake + 1, 92);
+            fill.style.width = pvcFake + '%';
+          }, 400);
+
+          const pvcRes = await fetch(`${API_BASE}/api/ppc-vs-organic`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              asin: asins,
+              target_acos: targetAcos,
+              keywords: matchedKws.slice(0, 30).map(k => ({
+                keyword: k.keyword,
+                organic_rank: k.organic_rank,
+                ppc_rows: k.ppc_rows,
+              })),
+            }),
+          });
+          clearInterval(pvcIv);
+          const pvcData = await pvcRes.json();
+          if (pvcRes.ok) {
+            bulkPVOResults = pvcData.results.map((r, i) => ({
+              ...r,
+              _asin: matchedKws[i]?._asin,
+              _matchedKw: matchedKws[i],
+            }));
+          }
+        }
+      }
+
       fill.style.width = '100%';
       ptext.textContent = 'Done!';
-      bulkResults = data.results;
 
       setTimeout(() => {
         hideEl('bulk-progress-container');
-        renderBulkResults(data.results);
+        renderBulkResults(bulkResults);
         showEl('bulk-results-card');
         document.getElementById('bulk-results-card').scrollIntoView({ behavior: 'smooth' });
       }, 400);
@@ -1119,7 +2001,9 @@
       showBulkError(err.message);
     } finally {
       btn.disabled = false;
-      btn.innerHTML = '🔍 Run Bulk Check';
+      btn.innerHTML = bulkAdsRows.length > 0
+        ? '🔍 Check Rankings + PPC vs Organic'
+        : '🔍 Check Rankings';
     }
   }
 
@@ -1146,13 +2030,9 @@
         return (a.position||999) - (b.position||999);
       });
       const rows = sorted.map(x => {
-        let rankEl;
-        if (x.found) {
-          const cls = x.position <= 10 ? 'rank-top' : x.position <= 30 ? 'rank-mid' : 'rank-low';
-          rankEl = `<span class="rank-badge ${cls}">#${x.position}</span>`;
-        } else {
-          rankEl = `<span class="rank-badge rank-none">—</span>`;
-        }
+        const rankEl = x.found
+          ? `<span class="rank-badge ${x.position<=10?'rank-top':x.position<=30?'rank-mid':'rank-low'}">#${x.position}</span>`
+          : `<span class="rank-badge rank-none">—</span>`;
         return `<tr>
           <td style="font-weight:500;padding-left:24px">${escHtml(x.term)}</td>
           <td>${rankEl}</td>
@@ -1176,6 +2056,122 @@
         </div>
       </div>`;
     }).join('');
+
+    // ── PPC vs Organic section ────────────────────────────────
+    if (bulkPVOResults.length > 0) {
+      const high   = bulkPVOResults.filter(r => r.priority === 'High').length;
+      const medium = bulkPVOResults.filter(r => r.priority === 'Medium').length;
+      const low    = bulkPVOResults.filter(r => r.priority === 'Low').length;
+
+      document.getElementById('bulk-pvo-desc').textContent =
+        `${bulkPVOResults.length} keyword${bulkPVOResults.length > 1 ? 's' : ''} matched between your ranking data and PPC report. Sorted by priority.`;
+
+      document.getElementById('bulk-pvo-summary-bar').innerHTML = `
+        <div class="summary-stat"><div class="val" style="color:#f87171">${high}</div><div class="lbl">High Priority</div></div>
+        <div class="summary-stat"><div class="val val-orange">${medium}</div><div class="lbl">Medium Priority</div></div>
+        <div class="summary-stat"><div class="val val-green">${low}</div><div class="lbl">Low Priority</div></div>
+        <div class="summary-stat"><div class="val">${bulkPVOResults.length}</div><div class="lbl">Keywords Analyzed</div></div>
+      `;
+
+      const order = { High: 0, Medium: 1, Low: 2 };
+      const sorted = [...bulkPVOResults].sort((a,b) => (order[a.priority]||1) - (order[b.priority]||1));
+
+      document.getElementById('bulk-pvo-results-body').innerHTML = sorted.map((r, i) => {
+        const p      = (r.priority || 'medium').toLowerCase();
+        const mkw    = r._matchedKw;
+        const rank   = r.organic_rank || mkw?.organic_rank || '?';
+        const rankCls = pvoRankClass(typeof rank === 'number' ? rank : 99);
+        const pageLbl = pvoPageLabel(typeof rank === 'number' ? rank : 99);
+        const ppcRows = mkw?.ppc_rows || [];
+        const accel   = (r.ranking_acceleration_score || 'LOW').toLowerCase();
+
+        // Per-campaign/ad-group/match-type data table
+        const campRows = ppcRows.map(pr => {
+          const acosStr = pr.acos != null ? `${(pr.acos*100).toFixed(1)}%` : '—';
+          const adGrpCell = pr.ad_group
+            ? `<span style="font-size:11px;color:var(--text-muted)">${escHtml(pr.ad_group)}</span>`
+            : '<span style="color:var(--text-muted)">—</span>';
+          return `<tr>
+            <td style="max-width:180px;word-break:break-word;font-size:12px">${escHtml(pr.campaign)}</td>
+            <td style="max-width:140px;word-break:break-word">${adGrpCell}</td>
+            <td><span class="mt-name ${mtClass(pr.match_type)}">${mtShort(pr.match_type)}</span></td>
+            <td>${pr.impressions.toLocaleString()}</td>
+            <td>${(pr.ctr*100).toFixed(2)}%</td>
+            <td>$${pr.cpc.toFixed(2)}</td>
+            <td>${pr.cvr.toFixed(1)}%</td>
+            <td>$${pr.spend.toFixed(2)}</td>
+            <td>${pr.orders}</td>
+            <td>$${pr.sales.toFixed(2)}</td>
+            <td>${acosStr}</td>
+          </tr>`;
+        }).join('');
+
+        return `<div class="pvo-card priority-${p}" id="bpvo-card-${i}">
+          <div class="pvo-card-header" onclick="toggleBPVOCard(${i})">
+            <div class="organic-rank-badge ${rankCls}">
+              <span>#${rank}</span>
+              <span class="rank-page-label">${pageLbl}</span>
+            </div>
+            <span class="pvo-kw-name">${escHtml(r.keyword)}</span>
+            <span class="accel-badge accel-${accel}" title="Ranking Acceleration Potential">⚡ ${(r.ranking_acceleration_score||'?')} ACCEL</span>
+            <span class="priority-badge badge-${p}">${r.priority}</span>
+            <span class="chevron" id="bpvo-chev-${i}">▼</span>
+          </div>
+          <div class="pvo-card-body ${p==='high'?'open':''}" id="bpvo-body-${i}">
+
+            <div class="pvo-analysis-block" style="margin-bottom:14px">
+              <div class="pvo-block-label" style="color:#93c5fd">🎯 Organic Position Summary</div>
+              <div class="pvo-block-text">${escHtml(r.organic_position_summary||'')}</div>
+            </div>
+
+            <div style="overflow-x:auto">
+              <table class="match-type-table">
+                <thead><tr>
+                  <th>Campaign</th><th>Ad Group</th><th>Match Type</th>
+                  <th>Impressions</th><th>CTR</th><th>CPC</th><th>CVR</th>
+                  <th>Spend</th><th>Orders</th><th>Sales</th><th>ACoS</th>
+                </tr></thead>
+                <tbody>${campRows}</tbody>
+              </table>
+            </div>
+
+            <div class="pvo-analysis-grid" style="grid-template-columns:1fr;margin-top:14px">
+              <div class="pvo-analysis-block full-width">
+                <div class="pvo-block-label" style="color:#a78bfa">⚖️ Campaign & Ad Group Comparison</div>
+                <div class="pvo-block-text">${escHtml(r.campaign_ad_group_comparison||'')}</div>
+              </div>
+            </div>
+
+            <div class="pvo-analysis-grid" style="margin-top:10px">
+              <div class="pvo-winner-box">
+                <div class="pvo-block-label" style="color:#4ade80">🏆 Winning Structure — Scale This</div>
+                <div class="pvo-block-text">${escHtml(r.winning_structure||'')}</div>
+              </div>
+              <div class="pvo-bottleneck-box">
+                <div class="pvo-block-label" style="color:#f87171">🩺 Bottleneck Analysis</div>
+                <div class="pvo-block-text">${escHtml(r.bottleneck_analysis||'')}</div>
+              </div>
+            </div>
+
+            <div class="pvo-action-box" style="margin-top:10px">
+              <div class="pvo-block-label" style="color:var(--accent)">✅ Recommended Actions</div>
+              <div class="pvo-block-text">${escHtml(r.recommended_actions||'')}</div>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+
+      showEl('bulk-pvo-section');
+      showEl('bulk-pvo-export-btn');
+    } else {
+      hideEl('bulk-pvo-section');
+      hideEl('bulk-pvo-export-btn');
+    }
+  }
+
+  function toggleBPVOCard(i) {
+    document.getElementById(`bpvo-body-${i}`).classList.toggle('open');
+    document.getElementById(`bpvo-chev-${i}`).classList.toggle('open');
   }
 
   function toggleBulkBlock(i) {
@@ -1204,18 +2200,1115 @@
     a.click(); URL.revokeObjectURL(url);
   }
 
+  function exportBulkPVOCSV() {
+    if (!bulkPVOResults.length) return;
+    const esc = s => `"${(s||'').replace(/"/g, '""')}"`;
+    const rows = [[
+      'Keyword','Organic Rank','Page Placement','Ranking Acceleration','Priority',
+      'Organic Position Summary','Campaign & Ad Group Comparison',
+      'Winning Structure','Bottleneck Analysis','Recommended Actions'
+    ]];
+    bulkPVOResults.forEach(r => {
+      rows.push([
+        esc(r.keyword),
+        r.organic_rank || '',
+        esc(r.page_placement),
+        r.ranking_acceleration_score || '',
+        r.priority || '',
+        esc(r.organic_position_summary),
+        esc(r.campaign_ad_group_comparison),
+        esc(r.winning_structure),
+        esc(r.bottleneck_analysis),
+        esc(r.recommended_actions),
+      ]);
+    });
+    const csv = rows.map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pvo-campaign-analysis-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  }
+
   function downloadTemplate(type) {
-    if (type === 'csv') {
-      window.open(`${API_BASE}/api/template.csv`, '_blank');
-    } else {
-      window.open(`${API_BASE}/static/asin_rank_template.xlsx`, '_blank');
-    }
+    const a = document.createElement('a');
+    a.href = type === 'csv'
+      ? `${API_BASE}/static/asin_rank_template.csv`
+      : `${API_BASE}/static/asin_rank_template.xlsx`;
+    a.download = type === 'csv' ? 'asin_rank_template.csv' : 'asin_rank_template.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   }
 
   function showBulkError(msg) {
     document.getElementById('bulk-error').textContent = '⚠ ' + msg;
     showEl('bulk-error');
   }
+
+  // ── PPC Analysis ─────────────────────────────────────────────
+
+  let ppcAllRows = [];
+  let ppcFilteredRows = [];
+  let ppcResults = [];
+  let ppcChips = { active: true, spend: true };
+
+  function handlePPCDrop(e) {
+    e.preventDefault();
+    document.getElementById('ppc-drop-zone').classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) parsePPCFile(file);
+  }
+  function handlePPCFile(e) {
+    const file = e.target.files[0];
+    if (file) parsePPCFile(file);
+  }
+
+  function parsePPCFile(file) {
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      alert('Please upload a .csv file (Amazon Target Report export).');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const lines = e.target.result.split(/\r?\n/).filter(l => l.trim());
+      if (lines.length < 2) { showPPCError('File appears empty.'); return; }
+
+      // Detect header row (may have BOM)
+      const header = parseCSVLine(lines[0]).map(h => h.replace(/^﻿/, '').toLowerCase().trim());
+
+      const idx = {
+        active: header.indexOf('active'),
+        target: header.indexOf('target'),
+        targetStatus: header.indexOf('target active status'),
+        matchType: header.indexOf('targeting type'),
+        campaign: header.indexOf('campaign'),
+        impressions: header.indexOf('impressions'),
+        tosIs: header.indexOf('top-of-search is'),
+        clicks: header.indexOf('clicks'),
+        spend: header.indexOf('spend'),
+        ctr: header.indexOf('ctr'),
+        orders: header.indexOf('orders'),
+        cvr: header.indexOf('conversion rate'),
+        sales: header.indexOf('sales'),
+        acos: header.indexOf('acos'),
+        cpc: header.indexOf('cpc'),
+        bid: header.indexOf('bid'),
+        suggestedBid: header.indexOf('suggested bid'),
+        roas: header.indexOf('roas'),
+      };
+
+      if (idx.target === -1 || idx.impressions === -1) {
+        showPPCError('Could not find required columns (Target, Impressions). Make sure this is an Amazon Target/Search Term Report.');
+        return;
+      }
+
+      ppcAllRows = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = parseCSVLine(lines[i]);
+        if (!cols || cols.length < 5) continue;
+        const g = (i) => (cols[i] || '').trim();
+        const gf = (i) => { const v = parseFloat(g(i)); return isNaN(v) ? null : v; };
+
+        const active = g(idx.active).toUpperCase() === 'ENABLED';
+        const targetStatus = idx.targetStatus >= 0 ? g(idx.targetStatus).toUpperCase() === 'ENABLED' : true;
+        const keyword = g(idx.target);
+        if (!keyword || keyword.toLowerCase() === 'target') continue;
+
+        ppcAllRows.push({
+          keyword,
+          active: active && targetStatus,
+          match_type: g(idx.matchType),
+          campaign: g(idx.campaign),
+          impressions: gf(idx.impressions) || 0,
+          top_of_search_is: gf(idx.tosIs),
+          clicks: gf(idx.clicks) || 0,
+          spend: gf(idx.spend) || 0,
+          ctr: gf(idx.ctr) || 0,
+          orders: gf(idx.orders) || 0,
+          cvr: gf(idx.cvr) || 0,
+          sales: gf(idx.sales) || 0,
+          acos: gf(idx.acos),
+          cpc: gf(idx.cpc) || 0,
+          bid: gf(idx.bid) || 0,
+          suggested_bid: gf(idx.suggestedBid),
+          roas: gf(idx.roas),
+          organic_rank: null,
+        });
+      }
+
+      if (!ppcAllRows.length) { showPPCError('No valid rows found in file.'); return; }
+      hideEl('ppc-error');
+      showEl('ppc-config-card');
+      applyPPCFilters();
+    };
+    reader.readAsText(file);
+  }
+
+  function toggleChip(name) {
+    ppcChips[name] = !ppcChips[name];
+    document.getElementById(`chip-${name}`).classList.toggle('active', ppcChips[name]);
+    applyPPCFilters();
+  }
+
+  function applyPPCFilters() {
+    let rows = [...ppcAllRows];
+    if (ppcChips.active) rows = rows.filter(r => r.active);
+    if (ppcChips.spend)  rows = rows.filter(r => r.spend > 0);
+    rows.sort((a, b) => b.spend - a.spend);
+    ppcFilteredRows = rows;
+
+    const topN = parseInt(document.getElementById('ppc-top-n').value);
+    const preview = rows.slice(0, topN);
+
+    document.getElementById('ppc-preview-stats').textContent =
+      `${rows.length} keywords match filters · showing top ${Math.min(topN, rows.length)} by spend`;
+    document.getElementById('ppc-kw-count').textContent =
+      `${Math.min(topN, rows.length)} keywords will be analyzed`;
+
+    document.getElementById('ppc-preview-body').innerHTML = preview.map((r, i) => {
+      const acosStr = r.acos !== null ? `${(r.acos * 100).toFixed(1)}%` : '—';
+      const ctrStr  = `${(r.ctr * 100).toFixed(2)}%`;
+      const cvrStr  = `${r.cvr.toFixed(1)}%`;
+      return `<tr>
+        <td style="color:var(--text-muted)">${i+1}</td>
+        <td style="font-weight:600;max-width:200px;word-break:break-word">${escHtml(r.keyword)}</td>
+        <td><span style="font-size:11px;color:var(--text-muted)">${escHtml(r.match_type.replace('Keyword - ','').replace('Product target - ',''))}</span></td>
+        <td>${r.impressions.toLocaleString()}</td>
+        <td>${ctrStr}</td>
+        <td>${cvrStr}</td>
+        <td>$${r.spend.toFixed(2)}</td>
+        <td>${acosStr}</td>
+        <td>${r.orders}</td>
+        <td><input type="number" min="1" max="500" placeholder="—"
+          style="width:70px;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:3px 6px;color:var(--text);font-size:12px;"
+          onchange="ppcFilteredRows[${i}].organic_rank = this.value ? parseInt(this.value) : null"
+          oninput="ppcFilteredRows[${i}].organic_rank = this.value ? parseInt(this.value) : null" /></td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Re-apply filters when top-N changes
+  document.getElementById('ppc-top-n').addEventListener('change', applyPPCFilters);
+
+  async function runPPCAnalysis() {
+    const topN = parseInt(document.getElementById('ppc-top-n').value);
+    const keywords = ppcFilteredRows.slice(0, topN);
+    if (!keywords.length) { showPPCError('No keywords to analyze.'); return; }
+
+    const targetAcosRaw = document.getElementById('ppc-target-acos').value;
+    const targetAcos = targetAcosRaw ? parseFloat(targetAcosRaw) : null;
+
+    const btn = document.getElementById('ppc-analyze-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Analyzing…';
+    showEl('ppc-progress-container');
+    hideEl('ppc-results-card');
+    hideEl('ppc-error');
+
+    const fill = document.getElementById('ppc-progress-fill');
+    const ptext = document.getElementById('ppc-progress-text');
+    let fake = 0;
+    const iv = setInterval(() => {
+      fake = Math.min(fake + 1, 85);
+      fill.style.width = fake + '%';
+      const msgs = [
+        'Claude is analyzing PPC efficiency…',
+        'Evaluating organic ranking opportunities…',
+        'Diagnosing traffic vs conversion bottlenecks…',
+        'Identifying wasted spend and scaling opportunities…',
+        'Building strategic recommendations…',
+      ];
+      ptext.textContent = msgs[Math.floor(fake / 20)];
+    }, 600);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/ppc-analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keywords, target_acos: targetAcos }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Analysis failed.');
+
+      clearInterval(iv);
+      fill.style.width = '100%';
+      ptext.textContent = 'Analysis complete!';
+      ppcResults = data.results;
+
+      setTimeout(() => {
+        hideEl('ppc-progress-container');
+        renderPPCResults(data.results, targetAcos);
+        showEl('ppc-results-card');
+        document.getElementById('ppc-results-card').scrollIntoView({ behavior: 'smooth' });
+      }, 400);
+    } catch (err) {
+      clearInterval(iv);
+      hideEl('ppc-progress-container');
+      showPPCError(err.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '🧠 Analyze with AI';
+    }
+  }
+
+  function renderPPCResults(results, targetAcos) {
+    const high   = results.filter(r => r.priority === 'High').length;
+    const medium = results.filter(r => r.priority === 'Medium').length;
+    const low    = results.filter(r => r.priority === 'Low').length;
+
+    document.getElementById('ppc-summary-bar').innerHTML = `
+      <div class="summary-stat"><div class="val" style="color:#f87171">${high}</div><div class="lbl">High Priority</div></div>
+      <div class="summary-stat"><div class="val val-orange">${medium}</div><div class="lbl">Medium Priority</div></div>
+      <div class="summary-stat"><div class="val val-green">${low}</div><div class="lbl">Low Priority</div></div>
+      <div class="summary-stat"><div class="val">${results.length}</div><div class="lbl">Keywords Analyzed</div></div>
+      ${targetAcos ? `<div class="summary-stat"><div class="val val-orange">${targetAcos}%</div><div class="lbl">Target ACoS</div></div>` : ''}
+    `;
+
+    // Sort: High first, then Medium, then Low
+    const order = { High: 0, Medium: 1, Low: 2 };
+    const sorted = [...results].sort((a, b) => (order[a.priority] || 1) - (order[b.priority] || 1));
+
+    document.getElementById('ppc-results-body').innerHTML = sorted.map((r, i) => {
+      const p = (r.priority || 'medium').toLowerCase();
+      const kw = ppcFilteredRows.find(k => k.keyword === r.keyword) || {};
+      const acosStr = kw.acos !== null && kw.acos !== undefined ? `${(kw.acos * 100).toFixed(1)}%` : '—';
+      const targetCmp = targetAcos && kw.acos !== null && kw.acos !== undefined
+        ? `<span style="font-size:11px;color:${kw.acos * 100 > targetAcos ? '#f87171' : '#4ade80'};margin-left:6px;">(target: ${targetAcos}%)</span>` : '';
+
+      const sections = [
+        ['label-organic',    '🔍 Organic Ranking Strength',      r.organic_strength],
+        ['label-traffic',    '📈 Traffic Opportunity',           r.traffic_opportunity],
+        ['label-conversion', '🎯 Conversion Quality',            r.conversion_quality],
+        ['label-ppc',        '⚡ PPC Efficiency',               r.ppc_efficiency],
+        ['label-scaling',    '🚀 Scaling Potential',             r.scaling_potential],
+        ['label-listing',    '📋 Listing Weakness Signals',      r.listing_weakness],
+        ['label-wasted',     '🗑 Wasted Spend',                  r.wasted_spend],
+        ['label-momentum',   '📊 Ranking Momentum Opportunity',  r.ranking_momentum],
+      ].filter(([,, v]) => v).map(([cls, label, text]) => `
+        <div class="analysis-section">
+          <div class="section-label ${cls}">${label}</div>
+          <div class="section-text">${escHtml(text)}</div>
+        </div>`).join('');
+
+      return `
+      <div class="ppc-card priority-${p}" id="ppc-card-${i}">
+        <div class="ppc-card-header" onclick="togglePPCCard(${i})">
+          <span class="ppc-kw-name">${escHtml(r.keyword)}</span>
+          <span class="ppc-kw-meta">${escHtml(r.match_type || '')}</span>
+          <span class="priority-badge badge-${p}">${r.priority}</span>
+          <span class="chevron" id="ppc-chev-${i}">▼</span>
+        </div>
+        <div class="ppc-card-body ${p === 'high' ? 'open' : ''}" id="ppc-body-${i}">
+          <div class="metrics-grid">
+            <div class="metric-cell"><div class="m-val">${(kw.impressions||0).toLocaleString()}</div><div class="m-lbl">Impressions</div></div>
+            <div class="metric-cell"><div class="m-val">${((kw.ctr||0)*100).toFixed(2)}%</div><div class="m-lbl">CTR</div></div>
+            <div class="metric-cell"><div class="m-val">${(kw.cvr||0).toFixed(1)}%</div><div class="m-lbl">CVR</div></div>
+            <div class="metric-cell"><div class="m-val">$${(kw.spend||0).toFixed(2)}</div><div class="m-lbl">Spend</div></div>
+            <div class="metric-cell"><div class="m-val">$${(kw.cpc||0).toFixed(2)}</div><div class="m-lbl">CPC</div></div>
+            <div class="metric-cell"><div class="m-val">${kw.orders||0}</div><div class="m-lbl">Orders</div></div>
+            <div class="metric-cell"><div class="m-val">$${(kw.sales||0).toFixed(2)}</div><div class="m-lbl">Sales</div></div>
+            <div class="metric-cell"><div class="m-val">${acosStr}${targetCmp}</div><div class="m-lbl">ACoS</div></div>
+            ${kw.organic_rank ? `<div class="metric-cell"><div class="m-val">#${kw.organic_rank}</div><div class="m-lbl">Organic Rank</div></div>` : ''}
+          </div>
+
+          <div class="analysis-sections">${sections}</div>
+
+          <div class="diagnosis-box" style="margin-top:12px;">
+            <div class="section-label label-diagnosis">🩺 Diagnosis</div>
+            <div class="section-text">${escHtml(r.diagnosis || '')}</div>
+          </div>
+          <div class="action-box" style="margin-top:10px;">
+            <div class="section-label label-action">✅ Recommended Action</div>
+            <div class="section-text">${escHtml(r.recommended_action || '')}</div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function togglePPCCard(i) {
+    const body = document.getElementById(`ppc-body-${i}`);
+    const chev = document.getElementById(`ppc-chev-${i}`);
+    body.classList.toggle('open');
+    chev.classList.toggle('open');
+  }
+
+  function exportPPCCSV() {
+    if (!ppcResults.length) return;
+    const rows = [['Keyword','Match Type','Priority','Impressions','CTR','CVR','Spend','ACoS','Orders','Sales','Diagnosis','Recommended Action']];
+    ppcResults.forEach(r => {
+      const kw = ppcFilteredRows.find(k => k.keyword === r.keyword) || {};
+      rows.push([
+        `"${r.keyword}"`, `"${r.match_type||''}"`, r.priority,
+        kw.impressions||0, `${((kw.ctr||0)*100).toFixed(2)}%`,
+        `${(kw.cvr||0).toFixed(1)}%`, `$${(kw.spend||0).toFixed(2)}`,
+        kw.acos !== null && kw.acos !== undefined ? `${(kw.acos*100).toFixed(1)}%` : '',
+        kw.orders||0, `$${(kw.sales||0).toFixed(2)}`,
+        `"${(r.diagnosis||'').replace(/"/g,"'")}"`,
+        `"${(r.recommended_action||'').replace(/"/g,"'")}"`
+      ]);
+    });
+    const csv = rows.map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ppc-analysis-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  }
+
+  function clearPPC() {
+    ppcAllRows = []; ppcFilteredRows = []; ppcResults = [];
+    document.getElementById('ppc-file-input').value = '';
+    hideEl('ppc-config-card');
+    hideEl('ppc-results-card');
+    hideEl('ppc-error');
+  }
+
+  function showPPCError(msg) {
+    document.getElementById('ppc-error').textContent = '⚠ ' + msg;
+    showEl('ppc-error');
+  }
+
+  // ── PPC vs Organic ────────────────────────────────────────────
+
+  let pvoOrganicKeywords = []; // [{term, position, page}]
+  let pvoPPCRows = [];          // same format as ppcAllRows
+  let pvoMatched = [];          // [{keyword, organic_rank, page, ppc_rows[]}]
+  let pvoResults = [];
+  let pvoAsin = '';
+
+  function switchMode(mode) {
+    ['single','bulk','report'].forEach(m => {
+      document.getElementById(`mode-${m}`).classList.toggle('hidden', m !== mode);
+      document.getElementById(`tab-${m}`).classList.toggle('active', m === mode);
+    });
+  }
+
+  // Import organic rank data from Single ASIN tab results
+  function pvoImportFromTracker() {
+    if (!lastResults || !lastResults.length) {
+      const s = document.getElementById('pvo-rank-status');
+      s.textContent = '⚠ No rank data found. Please run the Single ASIN rank check first, then come back here.';
+      s.className = 'status-msg status-error';
+      showEl('pvo-rank-status');
+      return;
+    }
+    const found = lastResults.filter(r => r.found);
+    if (!found.length) {
+      const s = document.getElementById('pvo-rank-status');
+      s.textContent = '⚠ No ranked keywords found in the last rank check (all returned "not found").';
+      s.className = 'status-msg status-error';
+      showEl('pvo-rank-status');
+      return;
+    }
+    pvoOrganicKeywords = found.map(r => ({ term: r.term, position: r.position, page: r.page }));
+    pvoAsin = currentASIN || '';
+    document.getElementById('pvo-asin').value = pvoAsin;
+
+    const s = document.getElementById('pvo-rank-status');
+    s.textContent = `✓ Imported ${found.length} ranked keyword${found.length > 1 ? 's' : ''} from rank tracker (ASIN: ${pvoAsin || 'unknown'}).`;
+    s.className = 'status-msg status-info';
+    showEl('pvo-rank-status');
+    showEl('pvo-step2-card');
+  }
+
+  // Load organic rank data from exported CSV (format: Search Term,Position,Page,Status,ASIN)
+  function pvoLoadRankCSV(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const lines = ev.target.result.split(/\r?\n/).filter(l => l.trim());
+      pvoOrganicKeywords = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = parseCSVLine(lines[i]);
+        const term = (cols[0] || '').replace(/^"|"$/g, '').trim();
+        const pos  = parseInt(cols[1]);
+        const page = parseInt(cols[2]);
+        const asin = (cols[4] || '').trim();
+        if (term && !isNaN(pos) && pos > 0) {
+          pvoOrganicKeywords.push({ term, position: pos, page: page || Math.ceil(pos / 16) });
+          if (asin && !pvoAsin) pvoAsin = asin;
+        }
+      }
+      if (!pvoOrganicKeywords.length) {
+        const s = document.getElementById('pvo-rank-status');
+        s.textContent = '⚠ No ranked keywords found in CSV. Use the rank tracker export format.';
+        s.className = 'status-msg status-error';
+        showEl('pvo-rank-status');
+        return;
+      }
+      document.getElementById('pvo-asin').value = pvoAsin;
+      const s = document.getElementById('pvo-rank-status');
+      s.textContent = `✓ Loaded ${pvoOrganicKeywords.length} ranked keywords from CSV.`;
+      s.className = 'status-msg status-info';
+      showEl('pvo-rank-status');
+      showEl('pvo-step2-card');
+    };
+    reader.readAsText(file);
+  }
+
+  function pvoPPCDrop(e) {
+    e.preventDefault();
+    document.getElementById('pvo-drop-zone').classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) pvoProcessPPCFile(file);
+  }
+  function pvoLoadPPCCSV(e) {
+    const file = e.target.files[0];
+    if (file) pvoProcessPPCFile(file);
+  }
+
+  function pvoProcessPPCFile(file) {
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      showEl('pvo-ppc-status');
+      document.getElementById('pvo-ppc-status').textContent = '⚠ Please upload a .csv file.';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      // Reuse the same PPC CSV parser from the PPC Analysis tab
+      const lines = ev.target.result.split(/\r?\n/).filter(l => l.trim());
+      if (lines.length < 2) { document.getElementById('pvo-ppc-status').textContent = '⚠ Empty file.'; showEl('pvo-ppc-status'); return; }
+
+      const header = parseCSVLine(lines[0]).map(h => h.replace(/^﻿/, '').toLowerCase().trim());
+      const idx = {
+        target: header.indexOf('target'),
+        matchType: header.indexOf('targeting type'),
+        campaign: header.indexOf('campaign'),
+        impressions: header.indexOf('impressions'),
+        tosIs: header.indexOf('top-of-search is'),
+        clicks: header.indexOf('clicks'),
+        spend: header.indexOf('spend'),
+        ctr: header.indexOf('ctr'),
+        orders: header.indexOf('orders'),
+        cvr: header.indexOf('conversion rate'),
+        sales: header.indexOf('sales'),
+        acos: header.indexOf('acos'),
+        cpc: header.indexOf('cpc'),
+        roas: header.indexOf('roas'),
+        active: header.indexOf('active'),
+        targetStatus: header.indexOf('target active status'),
+      };
+
+      pvoPPCRows = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = parseCSVLine(lines[i]);
+        if (!cols || cols.length < 5) continue;
+        const g  = j => (cols[j] || '').trim();
+        const gf = j => { const v = parseFloat(g(j)); return isNaN(v) ? null : v; };
+        const keyword = g(idx.target);
+        if (!keyword) continue;
+        pvoPPCRows.push({
+          keyword,
+          match_type: g(idx.matchType),
+          campaign: g(idx.campaign),
+          impressions: gf(idx.impressions) || 0,
+          top_of_search_is: gf(idx.tosIs),
+          clicks: gf(idx.clicks) || 0,
+          spend: gf(idx.spend) || 0,
+          ctr: gf(idx.ctr) || 0,
+          orders: gf(idx.orders) || 0,
+          cvr: gf(idx.cvr) || 0,
+          sales: gf(idx.sales) || 0,
+          acos: gf(idx.acos),
+          cpc: gf(idx.cpc) || 0,
+          roas: gf(idx.roas),
+        });
+      }
+
+      pvoMatchKeywords();
+    };
+    reader.readAsText(file);
+  }
+
+  function pvoMatchKeywords() {
+    pvoMatched = [];
+    for (const ok of pvoOrganicKeywords) {
+      const term = ok.term.toLowerCase().trim();
+      // Find all PPC rows where the target matches this keyword (exact or close)
+      const rows = pvoPPCRows.filter(r => r.keyword.toLowerCase().trim() === term);
+      if (!rows.length) continue;
+
+      // Aggregate by match type
+      const byType = {};
+      rows.forEach(r => {
+        const mt = r.match_type || 'Unknown';
+        if (!byType[mt]) byType[mt] = [];
+        byType[mt].push(r);
+      });
+
+      const ppc_rows = Object.entries(byType).map(([mt, rs]) => {
+        const totalImpr  = rs.reduce((s, r) => s + r.impressions, 0);
+        const totalClicks = rs.reduce((s, r) => s + r.clicks, 0);
+        const totalSpend = rs.reduce((s, r) => s + r.spend, 0);
+        const totalOrders = rs.reduce((s, r) => s + r.orders, 0);
+        const totalSales = rs.reduce((s, r) => s + r.sales, 0);
+        const tos = rs.find(r => r.top_of_search_is != null)?.top_of_search_is ?? null;
+        return {
+          match_type: mt,
+          campaign: [...new Set(rs.map(r => r.campaign))].join('; '),
+          impressions: totalImpr,
+          clicks: totalClicks,
+          ctr: totalImpr > 0 ? totalClicks / totalImpr : 0,
+          cpc: totalClicks > 0 ? totalSpend / totalClicks : 0,
+          spend: totalSpend,
+          orders: totalOrders,
+          sales: totalSales,
+          cvr: totalClicks > 0 ? (totalOrders / totalClicks) * 100 : 0,
+          acos: totalSales > 0 ? totalSpend / totalSales : null,
+          roas: totalSpend > 0 ? totalSales / totalSpend : null,
+          top_of_search_is: tos,
+        };
+      });
+
+      pvoMatched.push({
+        keyword: ok.term,
+        organic_rank: ok.position,
+        page: ok.page || Math.ceil(ok.position / 16),
+        ppc_rows,
+        _include: true,
+      });
+    }
+
+    if (!pvoMatched.length) {
+      document.getElementById('pvo-ppc-status').textContent =
+        '⚠ No matching keywords found between organic rank data and PPC report. Make sure the same search terms appear in both.';
+      showEl('pvo-ppc-status');
+      return;
+    }
+
+    hideEl('pvo-ppc-status');
+    renderPVOPreview();
+    showEl('pvo-step3-card');
+  }
+
+  function pvoRankClass(rank) {
+    if (rank <= 16) return 'rank-p1-strong';
+    if (rank <= 30) return 'rank-p1-lower';
+    if (rank <= 48) return 'rank-p2-early';
+    if (rank <= 80) return 'rank-p2-weak';
+    return 'rank-poor';
+  }
+  function pvoPageLabel(rank) {
+    if (rank <= 16) return 'P1 TOP';
+    if (rank <= 30) return 'P1 LOW';
+    if (rank <= 48) return 'P2 EARLY';
+    if (rank <= 80) return 'P2-3';
+    return 'P3+';
+  }
+  function mtClass(mt) {
+    const l = (mt || '').toLowerCase();
+    if (l.includes('exact'))   return 'mt-exact';
+    if (l.includes('phrase'))  return 'mt-phrase';
+    if (l.includes('broad'))   return 'mt-broad';
+    if (l.includes('product')) return 'mt-product';
+    return 'mt-other';
+  }
+  function mtShort(mt) {
+    const l = (mt || '').toLowerCase();
+    if (l.includes('exact'))   return 'Exact';
+    if (l.includes('phrase'))  return 'Phrase';
+    if (l.includes('broad'))   return 'Broad';
+    if (l.includes('product')) return 'Product';
+    return mt.replace('Keyword - ','').replace('Product target - ','');
+  }
+
+  function renderPVOPreview() {
+    const active = pvoMatched.filter(m => m._include);
+    document.getElementById('pvo-match-badge').textContent = `${active.length} matched`;
+    document.getElementById('pvo-preview-body').innerHTML = pvoMatched.map((m, i) => {
+      if (!m._include) return '';
+      const totalSpend  = m.ppc_rows.reduce((s, r) => s + r.spend, 0);
+      const totalOrders = m.ppc_rows.reduce((s, r) => s + r.orders, 0);
+      const chips = m.ppc_rows.map(r =>
+        `<span class="terms-pill ${mtClass(r.match_type)}">${mtShort(r.match_type)}</span>`
+      ).join('');
+      return `<tr>
+        <td style="font-weight:600">${escHtml(m.keyword)}</td>
+        <td><span class="organic-rank-badge ${pvoRankClass(m.organic_rank)}" style="width:auto;height:auto;padding:3px 8px;font-size:13px;flex-direction:row;gap:4px;">
+          #${m.organic_rank}
+        </span></td>
+        <td style="font-size:12px;color:var(--text-muted)">${pvoPageLabel(m.organic_rank)}</td>
+        <td><div class="mt-chips">${chips}</div></td>
+        <td>$${totalSpend.toFixed(2)}</td>
+        <td>${totalOrders}</td>
+        <td><button class="btn btn-danger" onclick="pvoRemoveKeyword(${i})">✕</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  function pvoRemoveKeyword(i) {
+    pvoMatched[i]._include = false;
+    renderPVOPreview();
+  }
+
+  async function runPVOAnalysis() {
+    const keywords = pvoMatched.filter(m => m._include);
+    if (!keywords.length) { showPVOError('No keywords selected.'); return; }
+
+    const asin = document.getElementById('pvo-asin').value.trim().toUpperCase() || 'UNKNOWN';
+    const targetAcosRaw = document.getElementById('pvo-target-acos').value;
+    const targetAcos = targetAcosRaw ? parseFloat(targetAcosRaw) : null;
+
+    const btn = document.getElementById('pvo-analyze-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Analyzing…';
+    showEl('pvo-progress-container');
+    hideEl('pvo-results-card');
+    hideEl('pvo-error');
+
+    const fill  = document.getElementById('pvo-progress-fill');
+    const ptext = document.getElementById('pvo-progress-text');
+    let fake = 0;
+    const msgs = [
+      'Comparing organic rank vs PPC data…',
+      'Analyzing match type performance…',
+      'Evaluating ranking momentum opportunities…',
+      'Identifying budget consolidation opportunities…',
+      'Building strategic recommendations…',
+    ];
+    const iv = setInterval(() => {
+      fake = Math.min(fake + 1, 87);
+      fill.style.width = fake + '%';
+      ptext.textContent = msgs[Math.min(Math.floor(fake / 20), msgs.length - 1)];
+    }, 600);
+
+    try {
+      const payload = {
+        asin,
+        target_acos: targetAcos,
+        keywords: keywords.map(m => ({
+          keyword: m.keyword,
+          organic_rank: m.organic_rank,
+          ppc_rows: m.ppc_rows,
+        })),
+      };
+
+      const res = await fetch(`${API_BASE}/api/ppc-vs-organic`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Analysis failed.');
+
+      clearInterval(iv);
+      fill.style.width = '100%';
+      ptext.textContent = 'Analysis complete!';
+      pvoResults = data.results;
+
+      setTimeout(() => {
+        hideEl('pvo-progress-container');
+        renderPVOResults(data.results, keywords, asin, targetAcos);
+        showEl('pvo-results-card');
+        document.getElementById('pvo-results-card').scrollIntoView({ behavior: 'smooth' });
+      }, 400);
+    } catch (err) {
+      clearInterval(iv);
+      hideEl('pvo-progress-container');
+      showPVOError(err.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '⚔️ Compare &amp; Analyze';
+    }
+  }
+
+  function renderPVOResults(results, matchedKws, asin, targetAcos) {
+    const high   = results.filter(r => r.priority === 'High').length;
+    const medium = results.filter(r => r.priority === 'Medium').length;
+    const low    = results.filter(r => r.priority === 'Low').length;
+
+    document.getElementById('pvo-summary-bar').innerHTML = `
+      <div class="summary-stat"><div class="val val-orange">${asin}</div><div class="lbl">ASIN</div></div>
+      <div class="summary-stat"><div class="val" style="color:#f87171">${high}</div><div class="lbl">High Priority</div></div>
+      <div class="summary-stat"><div class="val val-orange">${medium}</div><div class="lbl">Medium Priority</div></div>
+      <div class="summary-stat"><div class="val val-green">${low}</div><div class="lbl">Low Priority</div></div>
+      ${targetAcos ? `<div class="summary-stat"><div class="val val-orange">${targetAcos}%</div><div class="lbl">Target ACoS</div></div>` : ''}
+    `;
+
+    const order = { High: 0, Medium: 1, Low: 2 };
+    const sorted = [...results].sort((a, b) => (order[a.priority]||1) - (order[b.priority]||1));
+
+    document.getElementById('pvo-results-body').innerHTML = sorted.map((r, i) => {
+      const p   = (r.priority || 'medium').toLowerCase();
+      const mkw = matchedKws.find(m => m.keyword.toLowerCase() === r.keyword.toLowerCase());
+      const rank = r.organic_rank || mkw?.organic_rank || '?';
+      const rankCls = pvoRankClass(typeof rank === 'number' ? rank : 99);
+      const pageLbl = pvoPageLabel(typeof rank === 'number' ? rank : 99);
+
+      // Match type comparison table rows
+      const ppcRows = mkw?.ppc_rows || [];
+      const bestMT  = (r.best_match_type || '').toLowerCase();
+      const mtTableRows = ppcRows.map(pr => {
+        const isBest = mtShort(pr.match_type).toLowerCase() === bestMT ||
+                       pr.match_type.toLowerCase().includes(bestMT);
+        const acosStr = pr.acos != null ? `${(pr.acos * 100).toFixed(1)}%` : '—';
+        const roasStr = pr.roas != null ? `${pr.roas.toFixed(2)}x` : '—';
+        const targetCmp = targetAcos && pr.acos != null
+          ? `<span style="font-size:10px;color:${pr.acos * 100 > targetAcos ? '#f87171' : '#4ade80'};margin-left:4px;">${pr.acos * 100 > targetAcos ? '▲' : '▼'}</span>` : '';
+        return `<tr>
+          <td><span class="mt-name ${mtClass(pr.match_type)}">${mtShort(pr.match_type)}${isBest ? '<span class="best-mt-star">★</span>' : ''}</span></td>
+          <td>${pr.impressions.toLocaleString()}</td>
+          <td>${(pr.ctr * 100).toFixed(2)}%</td>
+          <td>$${pr.cpc.toFixed(2)}</td>
+          <td>${pr.cvr.toFixed(1)}%</td>
+          <td>$${pr.spend.toFixed(2)}</td>
+          <td>${pr.orders}</td>
+          <td>$${pr.sales.toFixed(2)}</td>
+          <td>${acosStr}${targetCmp}</td>
+          <td>${roasStr}</td>
+        </tr>`;
+      }).join('');
+
+      return `
+      <div class="pvo-card priority-${p}" id="pvo-card-${i}">
+        <div class="pvo-card-header" onclick="togglePVOCard(${i})">
+          <div class="organic-rank-badge ${rankCls}">
+            <span>#${rank}</span>
+            <span class="rank-page-label">${pageLbl}</span>
+          </div>
+          <span class="pvo-kw-name">${escHtml(r.keyword)}</span>
+          <span style="font-size:12px;color:var(--text-muted)">Best: <strong>${escHtml(r.best_match_type || '—')}</strong></span>
+          <span class="priority-badge badge-${p}">${r.priority}</span>
+          <span class="chevron" id="pvo-chev-${i}">▼</span>
+        </div>
+        <div class="pvo-card-body ${p === 'high' ? 'open' : ''}" id="pvo-body-${i}">
+
+          <table class="match-type-table">
+            <thead>
+              <tr>
+                <th>Match Type</th><th>Impressions</th><th>CTR</th>
+                <th>CPC</th><th>CVR</th><th>Spend</th>
+                <th>Orders</th><th>Sales</th><th>ACoS</th><th>ROAS</th>
+              </tr>
+            </thead>
+            <tbody>${mtTableRows}</tbody>
+          </table>
+
+          <div class="pvo-analysis-grid">
+            <div class="pvo-analysis-block">
+              <div class="pvo-block-label" style="color:#a78bfa">⚖️ Match Type Comparison</div>
+              <div class="pvo-block-text">${escHtml(r.match_type_comparison || '')}</div>
+            </div>
+            <div class="pvo-analysis-block">
+              <div class="pvo-block-label" style="color:#4ade80">📈 PPC Supporting Organic?</div>
+              <div class="pvo-block-text">${escHtml(r.ppc_supporting_organic || '')}</div>
+            </div>
+            <div class="pvo-diagnosis-box">
+              <div class="pvo-block-label" style="color:#c4b5fd">🩺 Strategic Analysis</div>
+              <div class="pvo-block-text">${escHtml(r.strategic_analysis || '')}</div>
+            </div>
+          </div>
+          <div class="pvo-action-box">
+            <div class="pvo-block-label" style="color:var(--accent)">✅ Recommended Actions</div>
+            <div class="pvo-block-text">${escHtml(r.recommended_actions || '')}</div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function togglePVOCard(i) {
+    document.getElementById(`pvo-body-${i}`).classList.toggle('open');
+    document.getElementById(`pvo-chev-${i}`).classList.toggle('open');
+  }
+
+  function exportPVOCSV() {
+    if (!pvoResults.length) return;
+    const rows = [['Keyword','Organic Rank','Page','Best Match Type','Priority','Strategic Analysis','Recommended Actions']];
+    pvoResults.forEach(r => {
+      rows.push([
+        `"${r.keyword}"`, r.organic_rank, r.page_placement || '',
+        r.best_match_type || '', r.priority,
+        `"${(r.strategic_analysis||'').replace(/"/g,"'")}"`,
+        `"${(r.recommended_actions||'').replace(/"/g,"'")}"`
+      ]);
+    });
+    const csv = rows.map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ppc-vs-organic-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  }
+
+  function clearPVO() {
+    pvoOrganicKeywords = []; pvoPPCRows = []; pvoMatched = []; pvoResults = [];
+    document.getElementById('pvo-rank-file').value = '';
+    document.getElementById('pvo-ppc-file').value = '';
+    hideEl('pvo-rank-status'); hideEl('pvo-step2-card');
+    hideEl('pvo-step3-card'); hideEl('pvo-results-card'); hideEl('pvo-error');
+  }
+
+  function showPVOError(msg) {
+    document.getElementById('pvo-error').textContent = '⚠ ' + msg;
+    showEl('pvo-error');
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // REPORT ANALYSIS
+  // ══════════════════════════════════════════════════════════════
+
+  let reportFilterFile = null;
+  let reportAdsFile = null;
+  let reportResults = [];
+  let reportSummaries = [];
+
+  // ── File handlers ─────────────────────────────────────────────
+
+  function handleReportFilterDrop(e) {
+    e.preventDefault();
+    document.getElementById('report-filter-zone').classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) parseReportFilterFile(file);
+  }
+  function handleReportFilterFile(e) {
+    const file = e.target.files[0];
+    if (file) parseReportFilterFile(file);
+  }
+
+  function parseReportFilterFile(file) {
+    const lower = file.name.toLowerCase();
+    if (!lower.endsWith('.csv') && !lower.endsWith('.xlsx') && !lower.endsWith('.xlsm')) {
+      alert('Please upload a .csv, .xlsx, or .xlsm file for the filter list.');
+      return;
+    }
+    reportFilterFile = file;
+    document.getElementById('report-filter-icon').textContent = '✅';
+    document.getElementById('report-filter-title').textContent = file.name;
+    document.getElementById('report-filter-sub').textContent = `${(file.size / 1024).toFixed(1)} KB · ready`;
+    const st = document.getElementById('report-filter-status');
+    st.textContent = '✓ ASIN & Search Terms file loaded. Rankings will be checked when you run analysis.';
+    st.className = 'status-msg status-info';
+    showEl('report-filter-status');
+    checkReportReady();
+  }
+
+  function handleReportAdsDrop(e) {
+    e.preventDefault();
+    document.getElementById('report-ads-zone').classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) parseReportAdsFile(file);
+  }
+  function handleReportAdsFile(e) {
+    const file = e.target.files[0];
+    if (file) parseReportAdsFile(file);
+  }
+
+  function parseReportAdsFile(file) {
+    const lower = file.name.toLowerCase();
+    if (!lower.endsWith('.xlsx') && !lower.endsWith('.xlsm')) {
+      alert('Please upload the full Amazon Ads report as an .xlsx or .xlsm workbook.');
+      return;
+    }
+    reportAdsFile = file;
+    document.getElementById('report-ads-icon').textContent = '✅';
+    document.getElementById('report-ads-title').textContent = file.name;
+    document.getElementById('report-ads-sub').textContent = `${(file.size / 1024 / 1024).toFixed(2)} MB · full workbook ready`;
+    const st = document.getElementById('report-ads-status');
+    st.textContent = '✓ Full Amazon Ads workbook loaded. The backend will read Search Term, Targeting, Placement, and Advertised Product sheets.';
+    st.className = 'status-msg status-info';
+    showEl('report-ads-status');
+    checkReportReady();
+  }
+
+  function checkReportReady() {
+    const ready = !!reportFilterFile && !!reportAdsFile;
+    document.getElementById('report-run-btn').disabled = !ready;
+  }
+
+  function clearReport() {
+    reportFilterFile = null; reportAdsFile = null; reportResults = []; reportSummaries = [];
+    document.getElementById('report-filter-input').value = '';
+    document.getElementById('report-ads-input').value = '';
+    document.getElementById('report-filter-icon').textContent = '📋';
+    document.getElementById('report-filter-title').textContent = 'Drop ASIN & Search Terms File';
+    document.getElementById('report-filter-sub').textContent = 'CSV or XLSX · Click to browse';
+    document.getElementById('report-ads-icon').textContent = '📊';
+    document.getElementById('report-ads-title').textContent = 'Drop Full Amazon Ads Report XLSX';
+    document.getElementById('report-ads-sub').textContent = 'Uses Search Term, Targeting, Placement, and Advertised Product tabs';
+    hideEl('report-filter-status'); hideEl('report-ads-status');
+    hideEl('report-results-card'); hideEl('report-error');
+    hideEl('report-progress-container');
+    document.getElementById('report-run-btn').disabled = true;
+  }
+
+  // ── Main run function ─────────────────────────────────────────
+
+  async function runReportAnalysis() {
+    const btn = document.getElementById('report-run-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Running…';
+    showEl('report-progress-container');
+    hideEl('report-results-card');
+    hideEl('report-error');
+
+    const fill  = document.getElementById('report-progress-fill');
+    const ptext = document.getElementById('report-progress-text');
+
+    let fake = 0;
+    const iv = setInterval(() => {
+      fake = Math.min(fake + 2, 88);
+      fill.style.width = fake + '%';
+      ptext.textContent = 'Checking rankings, parsing workbook, and comparing campaign structures…';
+    }, 500);
+
+    try {
+      const fd = new FormData();
+      const targetAcos = parseFloat(document.getElementById('report-target-acos').value) || 20;
+      fd.append('filter_file', reportFilterFile);
+      fd.append('ads_file', reportAdsFile);
+      fd.append('target_acos', String(targetAcos));
+
+      const analysisRes = await fetch(`${API_BASE}/api/full-report-analysis`, {
+        method: 'POST',
+        body: fd,
+      });
+      clearInterval(iv);
+      const analysisData = await analysisRes.json();
+      if (!analysisRes.ok) throw new Error(analysisData.detail || 'Analysis failed.');
+      if (analysisData.message && !(analysisData.rows || []).length) throw new Error(analysisData.message);
+
+      fill.style.width = '100%';
+      reportResults = analysisData.rows || [];
+      reportSummaries = analysisData.summaries || [];
+      renderReportTable(reportResults, reportSummaries);
+
+    } catch(err) {
+      clearInterval(iv);
+      document.getElementById('report-error').textContent = '⚠ ' + err.message;
+      showEl('report-error');
+    } finally {
+      hideEl('report-progress-container');
+      fill.style.width = '0%';
+      btn.disabled = false;
+      btn.innerHTML = '📊 Analyze Campaign Opportunities';
+    }
+  }
+
+  // ── Table rendering ───────────────────────────────────────────
+
+  function actionClass(action) {
+    if (!action) return 'action-hold';
+    const a = action.toLowerCase();
+    if (a.includes('scale')) return 'action-scale';
+    if (a.includes('moderate')) return 'action-mod';
+    if (a.includes('hold')) return 'action-hold';
+    if (a.includes('reduce') && a.includes('broad')) return 'action-broad';
+    if (a.includes('reduce') || a.includes('waste')) return 'action-reduce';
+    if (a.includes('listing')) return 'action-list';
+    if (a.includes('exact')) return 'action-exact';
+    return 'action-hold';
+  }
+
+  function bidClass(bid) {
+    if (!bid) return 'bid-flat';
+    if (bid.startsWith('+') && bid !== '+0%') return 'bid-up';
+    if (bid.startsWith('-')) return 'bid-down';
+    return 'bid-flat';
+  }
+
+  function renderReportTable(rows, summaries = []) {
+    if (!rows.length) return;
+
+    // Stats
+    const scale  = rows.filter(r => (r.action||'').toLowerCase().includes('scale')).length;
+    const reduce = rows.filter(r => {
+      const a = (r.action||'').toLowerCase();
+      return a.includes('reduce') || a.includes('waste');
+    }).length;
+    const hold   = rows.filter(r => (r.action||'').toLowerCase().includes('hold')).length;
+
+    document.getElementById('report-stats-bar').innerHTML = `
+      <div class="report-stat"><div class="val" style="color:var(--success)">${scale}</div><div class="lbl">Scale</div></div>
+      <div class="report-stat"><div class="val" style="color:#a78bfa">${rows.filter(r=>(r.action||'').toLowerCase().includes('moderate')).length}</div><div class="lbl">Moderate Increase</div></div>
+      <div class="report-stat"><div class="val" style="color:var(--warn)">${hold}</div><div class="lbl">Hold</div></div>
+      <div class="report-stat"><div class="val" style="color:#f87171">${reduce}</div><div class="lbl">Reduce</div></div>
+      <div class="report-stat"><div class="val">${rows.length}</div><div class="lbl">Total Rows</div></div>
+    `;
+
+    document.getElementById('report-summary-body').innerHTML = summaries.map(s => `
+      <div class="pvo-analysis-block">
+        <div class="pvo-block-label" style="color:var(--accent)">ASIN ${escHtml(s.asin || '')}</div>
+        <div class="pvo-block-text">
+          <strong>Best:</strong> ${escHtml(s.best_campaign || '—')}<br>
+          <strong>Waste:</strong> ${escHtml(s.wasted_campaign || '—')}<br>
+          <strong>Opportunity:</strong> ${escHtml(s.best_keyword_opportunity || '—')}<br>
+          <strong>Budget shift:</strong> ${escHtml(s.budget_shift || '—')}
+        </div>
+      </div>
+    `).join('');
+
+    document.getElementById('report-table-body').innerHTML = rows.map(r => {
+      const bc = bidClass(r.bid_change);
+      const ac = actionClass(r.action);
+      return `<tr>
+        <td style="font-family:monospace;font-size:12px;color:var(--accent)">${escHtml(r.asin||'')}</td>
+        <td style="font-weight:600">${escHtml(r.keyword||'')}</td>
+        <td style="text-align:center;font-weight:800">${r.organic_rank||'?'}</td>
+        <td style="font-size:12px;color:var(--text-muted)">${escHtml(r.amazon_page||'')}</td>
+        <td style="font-size:12px;max-width:180px;word-break:break-word">${escHtml(r.campaign_name||'')}</td>
+        <td style="font-size:12px;color:var(--text-muted);max-width:140px;word-break:break-word">${escHtml(r.ad_group_name||'')}</td>
+        <td><span class="mt-name ${mtClass(r.match_type)}">${escHtml(r.match_type||'')}</span></td>
+        <td style="font-size:12px;color:var(--text-muted)">${escHtml(r.source||'')}</td>
+        <td>${escHtml(r.ctr||'—')}</td>
+        <td>${escHtml(r.cvr||'—')}</td>
+        <td>${escHtml(r.acos||'—')}</td>
+        <td>${escHtml(r.top_of_search||'—')}</td>
+        <td style="color:var(--text-muted)">${escHtml(r.target_acos||'')}</td>
+        <td class="${bc}">${escHtml(r.bid_change||'—')}</td>
+        <td><span class="action-badge ${ac}">${escHtml(r.action||'—')}</span></td>
+        <td style="font-size:12px;max-width:240px;white-space:normal">${escHtml(r.reason||'')}</td>
+      </tr>`;
+    }).join('');
+
+    showEl('report-results-card');
+  }
+
+  // ── Export ────────────────────────────────────────────────────
+
+  async function exportReportCSV() {
+    if (!reportResults.length) return;
+    const rows = [['ASIN','Keyword','Organic Rank','Amazon Page','Campaign Name','Ad Group Name','Match Type','Source','CTR','CVR','ACoS','Top of Search','Target ACoS','Bid Change','Action','Reason']];
+    reportResults.forEach(r => {
+      rows.push([
+        r.asin || '', r.keyword || '',
+        String(r.organic_rank || ''),
+        r.amazon_page || '',
+        r.campaign_name || '', r.ad_group_name || '', r.match_type || '', r.source || '',
+        r.ctr || '', r.cvr || '', r.acos || '', r.top_of_search || '', r.target_acos || '',
+        r.bid_change || '', r.action || '', r.reason || '',
+      ]);
+    });
+
+    const filename = `ads-opportunity-analysis-${new Date().toISOString().slice(0,10)}.csv`;
+    const status = document.getElementById('report-export-status');
+    status.className = 'status-msg status-info';
+    status.textContent = 'Saving CSV…';
+    showEl('report-export-status');
+
+    try {
+      const res = await fetch(`${API_BASE}/api/save-csv`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename, rows }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Could not save CSV.');
+
+      status.className = 'status-msg status-info';
+      status.innerHTML = `✓ CSV saved: <a href="${data.url}" target="_blank" style="color:var(--accent)">${escHtml(data.filename)}</a><br><code>${escHtml(data.path)}</code>`;
+    } catch (err) {
+      status.textContent = '⚠ ' + err.message;
+      status.className = 'status-msg status-error';
+    }
+  }
+
 </script>
 </body>
 </html>
