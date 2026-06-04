@@ -838,10 +838,22 @@ def _norm_key(value) -> str:
     return _norm_text(value).lower()
 
 
-def _sheet_dicts(wb, sheet_name: str) -> list[dict]:
-    if sheet_name not in wb.sheetnames:
+def _find_sheet_name(wb, *needles: str) -> Optional[str]:
+    normalized = {
+        name: "".join(ch for ch in name.lower() if ch.isalnum())
+        for name in wb.sheetnames
+    }
+    for name, compact in normalized.items():
+        if all("".join(ch for ch in needle.lower() if ch.isalnum()) in compact for needle in needles):
+            return name
+    return None
+
+
+def _sheet_dicts(wb, sheet_name: str = "", *needles: str) -> list[dict]:
+    actual_name = sheet_name if sheet_name in wb.sheetnames else _find_sheet_name(wb, *(needles or (sheet_name,)))
+    if not actual_name:
         return []
-    ws = wb[sheet_name]
+    ws = wb[actual_name]
     rows = list(ws.iter_rows(values_only=True))
     if not rows:
         return []
@@ -873,10 +885,10 @@ def _parse_full_ads_workbook(content: bytes) -> dict[str, list[ReportCampaignRow
 
     wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
     try:
-        advertised = _sheet_dicts(wb, "Sponsored_Products_Advertised_p")
-        search_terms = _sheet_dicts(wb, "Sponsored_Products_Search_Term_")
-        targeting = _sheet_dicts(wb, "Sponsored_Products_Targeting_re")
-        placement = _sheet_dicts(wb, "Sponsored_Products_Placement_re")
+        advertised = _sheet_dicts(wb, "Sponsored_Products_Advertised_p", "sponsored", "products", "advertised")
+        search_terms = _sheet_dicts(wb, "Sponsored_Products_Search_Term_", "sponsored", "products", "search", "term")
+        targeting = _sheet_dicts(wb, "Sponsored_Products_Targeting_re", "sponsored", "products", "targeting")
+        placement = _sheet_dicts(wb, "Sponsored_Products_Placement_re", "sponsored", "products", "placement")
     finally:
         wb.close()
 
@@ -1011,6 +1023,14 @@ def _parse_full_ads_workbook(content: bytes) -> dict[str, list[ReportCampaignRow
     return result
 
 
+def _merge_ads_maps(maps: list[dict[str, list[ReportCampaignRow]]]) -> dict[str, list[ReportCampaignRow]]:
+    merged: dict[str, list[ReportCampaignRow]] = {}
+    for ads_map in maps:
+        for key, rows in ads_map.items():
+            merged.setdefault(key, []).extend(rows)
+    return merged
+
+
 def _run_report_ai(keywords: list[ReportKeyword], target_acos: float) -> dict:
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     all_rows = []
@@ -1052,7 +1072,8 @@ async def report_analysis(req: ReportAnalysisRequest):
 @app.post("/api/full-report-analysis")
 async def full_report_analysis(
     filter_file: UploadFile = File(...),
-    ads_file: UploadFile = File(...),
+    ads_files: Optional[list[UploadFile]] = File(default=None),
+    ads_file: Optional[UploadFile] = File(default=None),
     target_acos: float = Form(20.0),
 ):
     if not SERPAPI_KEY:
@@ -1061,19 +1082,40 @@ async def full_report_analysis(
         raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not configured.")
 
     filter_name = filter_file.filename or ""
-    ads_name = ads_file.filename or ""
+    all_ads_files = list(ads_files or [])
+    if ads_file is not None:
+        all_ads_files.append(ads_file)
+
     if not (filter_name.lower().endswith(".csv") or filter_name.lower().endswith((".xlsx", ".xlsm"))):
         raise HTTPException(status_code=400, detail="ASIN + Search Terms file must be .csv, .xlsx, or .xlsm.")
-    if not ads_name.lower().endswith((".xlsx", ".xlsm")):
-        raise HTTPException(status_code=400, detail="Full Amazon Ads report must be an .xlsx or .xlsm workbook.")
+    if not all_ads_files:
+        raise HTTPException(status_code=400, detail="Upload at least one full Amazon Ads .xlsx or .xlsm workbook.")
+    for uploaded in all_ads_files:
+        ads_name = uploaded.filename or ""
+        if not ads_name.lower().endswith((".xlsx", ".xlsm")):
+            raise HTTPException(status_code=400, detail=f"{ads_name or 'Ads report'} must be an .xlsx or .xlsm workbook.")
 
     entries = parse_upload(await filter_file.read(), filter_name)
     if not entries:
         raise HTTPException(status_code=400, detail="No valid ASIN + search term rows found in filter file.")
 
-    ads_map = _parse_full_ads_workbook(await ads_file.read())
+    parsed_maps = []
+    parse_errors = []
+    for uploaded in all_ads_files:
+        ads_name = uploaded.filename or "ads workbook"
+        try:
+            parsed = _parse_full_ads_workbook(await uploaded.read())
+            if parsed:
+                parsed_maps.append(parsed)
+            else:
+                parse_errors.append(f"{ads_name}: no usable Search Term/Targeting data found")
+        except Exception as e:
+            parse_errors.append(f"{ads_name}: {e}")
+
+    ads_map = _merge_ads_maps(parsed_maps)
     if not ads_map:
-        raise HTTPException(status_code=400, detail="Could not parse usable campaign/search term data from the ads workbook.")
+        details = "; ".join(parse_errors[:5]) if parse_errors else "No usable ad rows found."
+        raise HTTPException(status_code=400, detail=f"Could not parse usable campaign/search term data from uploaded ads workbook(s). {details}")
 
     rank_results = []
     keyword_groups = []
@@ -1112,6 +1154,7 @@ async def full_report_analysis(
     analysis.update({
         "rank_results": rank_results,
         "matched_groups": len(keyword_groups),
+        "ads_files_parsed": len(parsed_maps),
     })
     return analysis
 

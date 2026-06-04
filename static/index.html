@@ -949,8 +949,8 @@
           <div class="upload-col-header">
             <span class="upload-col-num">2</span>
             <div>
-              <div class="upload-col-title">Full Amazon Ads Workbook</div>
-              <div class="upload-col-sub">XLSX · Advertised Product, Search Term, Targeting, Placement sheets</div>
+              <div class="upload-col-title">Amazon Ads Workbooks</div>
+              <div class="upload-col-sub">Select one or many XLSX/XLSM reports · Search Term, Targeting, Placement, Advertised Product</div>
             </div>
           </div>
           <div class="drop-zone" id="report-ads-zone"
@@ -959,9 +959,9 @@
                ondrop="handleReportAdsDrop(event)"
                onclick="document.getElementById('report-ads-input').click()">
             <span id="report-ads-icon" style="font-size:32px">📊</span>
-            <div id="report-ads-title" style="font-weight:700;margin-top:8px">Drop Full Amazon Ads Report XLSX</div>
-            <div id="report-ads-sub" style="font-size:12px;color:var(--text-muted);margin-top:4px">Uses Search Term, Targeting, Placement, and Advertised Product tabs</div>
-            <input type="file" id="report-ads-input" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12" style="display:none" onchange="handleReportAdsFile(event)">
+            <div id="report-ads-title" style="font-weight:700;margin-top:8px">Drop Amazon Ads Report XLSX files</div>
+            <div id="report-ads-sub" style="font-size:12px;color:var(--text-muted);margin-top:4px">Multiple files allowed · original Amazon Excel reports</div>
+            <input type="file" id="report-ads-input" multiple accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12" style="display:none" onchange="handleReportAdsFile(event)">
           </div>
           <div id="report-ads-status" class="status-msg hidden" style="margin-top:8px"></div>
         </div>
@@ -3055,7 +3055,7 @@
   // ══════════════════════════════════════════════════════════════
 
   let reportFilterFile = null;
-  let reportAdsFile = null;
+  let reportAdsFiles = [];
   let reportResults = [];
   let reportSummaries = [];
 
@@ -3092,46 +3092,51 @@
   function handleReportAdsDrop(e) {
     e.preventDefault();
     document.getElementById('report-ads-zone').classList.remove('drag-over');
-    const file = e.dataTransfer.files[0];
-    if (file) parseReportAdsFile(file);
+    const files = [...e.dataTransfer.files];
+    if (files.length) parseReportAdsFile(files);
   }
   function handleReportAdsFile(e) {
-    const file = e.target.files[0];
-    if (file) parseReportAdsFile(file);
+    const files = [...e.target.files];
+    if (files.length) parseReportAdsFile(files);
   }
 
-  function parseReportAdsFile(file) {
-    const lower = file.name.toLowerCase();
-    if (!lower.endsWith('.xlsx') && !lower.endsWith('.xlsm')) {
-      alert('Please upload the full Amazon Ads report as an .xlsx or .xlsm workbook.');
+  function parseReportAdsFile(files) {
+    const selected = Array.isArray(files) ? files : [files];
+    const invalid = selected.filter(file => {
+      const lower = file.name.toLowerCase();
+      return !lower.endsWith('.xlsx') && !lower.endsWith('.xlsm');
+    });
+    if (invalid.length) {
+      alert('Please upload only .xlsx or .xlsm Amazon Ads workbooks.');
       return;
     }
-    reportAdsFile = file;
+    reportAdsFiles = selected;
+    const totalMb = selected.reduce((sum, file) => sum + file.size, 0) / 1024 / 1024;
     document.getElementById('report-ads-icon').textContent = '✅';
-    document.getElementById('report-ads-title').textContent = file.name;
-    document.getElementById('report-ads-sub').textContent = `${(file.size / 1024 / 1024).toFixed(2)} MB · full workbook ready`;
+    document.getElementById('report-ads-title').textContent = selected.length === 1 ? selected[0].name : `${selected.length} ads report files selected`;
+    document.getElementById('report-ads-sub').textContent = `${totalMb.toFixed(2)} MB total · ready`;
     const st = document.getElementById('report-ads-status');
-    st.textContent = '✓ Full Amazon Ads workbook loaded. The backend will read Search Term, Targeting, Placement, and Advertised Product sheets.';
+    st.textContent = `✓ ${selected.length} Amazon Ads workbook${selected.length > 1 ? 's' : ''} loaded. The backend will merge Search Term, Targeting, Placement, and Advertised Product sheets.`;
     st.className = 'status-msg status-info';
     showEl('report-ads-status');
     checkReportReady();
   }
 
   function checkReportReady() {
-    const ready = !!reportFilterFile && !!reportAdsFile;
+    const ready = !!reportFilterFile && reportAdsFiles.length > 0;
     document.getElementById('report-run-btn').disabled = !ready;
   }
 
   function clearReport() {
-    reportFilterFile = null; reportAdsFile = null; reportResults = []; reportSummaries = [];
+    reportFilterFile = null; reportAdsFiles = []; reportResults = []; reportSummaries = [];
     document.getElementById('report-filter-input').value = '';
     document.getElementById('report-ads-input').value = '';
     document.getElementById('report-filter-icon').textContent = '📋';
     document.getElementById('report-filter-title').textContent = 'Drop ASIN & Search Terms File';
     document.getElementById('report-filter-sub').textContent = 'CSV or XLSX · Click to browse';
     document.getElementById('report-ads-icon').textContent = '📊';
-    document.getElementById('report-ads-title').textContent = 'Drop Full Amazon Ads Report XLSX';
-    document.getElementById('report-ads-sub').textContent = 'Uses Search Term, Targeting, Placement, and Advertised Product tabs';
+    document.getElementById('report-ads-title').textContent = 'Drop Amazon Ads Report XLSX files';
+    document.getElementById('report-ads-sub').textContent = 'Multiple files allowed · original Amazon Excel reports';
     hideEl('report-filter-status'); hideEl('report-ads-status');
     hideEl('report-results-card'); hideEl('report-error');
     hideEl('report-progress-container');
@@ -3162,7 +3167,7 @@
       const fd = new FormData();
       const targetAcos = parseFloat(document.getElementById('report-target-acos').value) || 20;
       fd.append('filter_file', reportFilterFile);
-      fd.append('ads_file', reportAdsFile);
+      reportAdsFiles.forEach(file => fd.append('ads_files', file));
       fd.append('target_acos', String(targetAcos));
 
       const analysisRes = await fetch(`${API_BASE}/api/full-report-analysis`, {
