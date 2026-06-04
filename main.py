@@ -169,9 +169,15 @@ Product Title: {req.product_title}
 
 Rules:
 - Return ONLY the search terms, one per line, no numbering, no explanation
-- Include a mix of: broad terms, specific terms, long-tail phrases, use-case terms
+- Return exactly this mix:
+  - 2 short head terms (1-2 words)
+  - 5 mid-tail terms (2-4 words)
+  - 3 long-tail terms (4-6 words)
+- Prioritize mid-tail terms because they are usually the best balance of search volume, buyer intent, and ranking opportunity
+- Mid-tail terms should sound like normal Amazon searches, not overly specific phrases
 - Think about what a real buyer would search for
 - Terms should be 1-6 words each
+- Avoid making every term a long-tail use-case phrase
 - Do not include the ASIN itself"""
 
     message = client.messages.create(
