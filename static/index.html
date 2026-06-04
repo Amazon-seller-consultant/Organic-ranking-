@@ -1245,8 +1245,8 @@
 </div>
 
 <script>
-  // When opened as file:// or from a different origin, point directly at the API server
-  const API_BASE = window.location.protocol === 'file:' || window.location.port !== '8000'
+  // Only file:// previews need the local API fallback. Hosted deployments use same-origin API calls.
+  const API_BASE = window.location.protocol === 'file:'
     ? 'http://localhost:8000'
     : '';
 
