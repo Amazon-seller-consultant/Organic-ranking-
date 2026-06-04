@@ -2,6 +2,6 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
+startCommand = "python serve.py"
 healthcheckPath = "/"
 restartPolicyType = "on_failure"
