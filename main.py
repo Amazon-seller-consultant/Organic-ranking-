@@ -838,6 +838,11 @@ def _norm_key(value) -> str:
     return _norm_text(value).lower()
 
 
+def _keyword_key(value) -> str:
+    text = _norm_key(value).strip(" \t\r\n\"'“”‘’,,.;:")
+    return " ".join(text.split())
+
+
 def _find_sheet_name(wb, *needles: str) -> Optional[str]:
     normalized = {
         name: "".join(ch for ch in name.lower() if ch.isalnum())
@@ -849,11 +854,12 @@ def _find_sheet_name(wb, *needles: str) -> Optional[str]:
     return None
 
 
-def _sheet_dicts(wb, sheet_name: str = "", *needles: str) -> list[dict]:
-    actual_name = sheet_name if sheet_name in wb.sheetnames else _find_sheet_name(wb, *(needles or (sheet_name,)))
-    if not actual_name:
-        return []
-    ws = wb[actual_name]
+def _worksheet_dicts(ws) -> list[dict]:
+    if hasattr(ws, "reset_dimensions"):
+        try:
+            ws.reset_dimensions()
+        except Exception:
+            pass
     rows = list(ws.iter_rows(values_only=True))
     if not rows:
         return []
@@ -863,6 +869,13 @@ def _sheet_dicts(wb, sheet_name: str = "", *needles: str) -> list[dict]:
         row = {headers[i]: raw[i] if i < len(raw) else None for i in range(len(headers))}
         output.append(row)
     return output
+
+
+def _sheet_dicts(wb, sheet_name: str = "", *needles: str) -> list[dict]:
+    actual_name = sheet_name if sheet_name in wb.sheetnames else _find_sheet_name(wb, *(needles or (sheet_name,)))
+    if not actual_name:
+        return []
+    return _worksheet_dicts(wb[actual_name])
 
 
 def _row_get(row: dict, *names: str):
@@ -879,22 +892,62 @@ def _row_get(row: dict, *names: str):
     return None
 
 
-def _parse_full_ads_workbook(content: bytes) -> dict[str, list[ReportCampaignRow]]:
-    """Return map key 'ASIN|||keyword' -> campaign/ad group rows from full Amazon ads workbook."""
+def _row_has(row: dict, *names: str) -> bool:
+    return any(_row_get(row, name) is not None for name in names)
+
+
+def _extract_ads_report_sheets(content: bytes) -> dict[str, list[dict]]:
+    """Extract usable report rows from either a multi-tab workbook or a single-report workbook."""
     from openpyxl import load_workbook
 
+    extracted = {
+        "advertised": [],
+        "purchased": [],
+        "search_terms": [],
+        "targeting": [],
+        "placement": [],
+    }
     wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
     try:
-        advertised = _sheet_dicts(wb, "Sponsored_Products_Advertised_p", "sponsored", "products", "advertised")
-        search_terms = _sheet_dicts(wb, "Sponsored_Products_Search_Term_", "sponsored", "products", "search", "term")
-        targeting = _sheet_dicts(wb, "Sponsored_Products_Targeting_re", "sponsored", "products", "targeting")
-        placement = _sheet_dicts(wb, "Sponsored_Products_Placement_re", "sponsored", "products", "placement")
+        for ws in wb.worksheets:
+            rows = _worksheet_dicts(ws)
+            if not rows:
+                continue
+            sample = next((row for row in rows if any(v not in (None, "") for v in row.values())), rows[0])
+            sheet_key = "".join(ch for ch in ws.title.lower() if ch.isalnum())
+            has_advertised_asin = _row_has(sample, "Advertised ASIN")
+            has_purchased_asin = _row_has(sample, "Purchased ASIN")
+            has_search_term = _row_has(sample, "Customer Search Term", "Search Term")
+            has_targeting = _row_has(sample, "Targeting", "Target")
+            has_placement = _row_has(sample, "Placement")
+
+            if has_placement or "placement" in sheet_key or sheet_key == "placements":
+                extracted["placement"].extend(rows)
+            elif has_search_term or ("search" in sheet_key and "term" in sheet_key):
+                extracted["search_terms"].extend(rows)
+            elif has_advertised_asin and has_purchased_asin:
+                extracted["purchased"].extend(rows)
+            elif has_targeting or "targeting" in sheet_key:
+                extracted["targeting"].extend(rows)
+            elif has_advertised_asin or ("advertised" in sheet_key and "product" in sheet_key):
+                extracted["advertised"].extend(rows)
     finally:
         wb.close()
+    return extracted
+
+
+def _parse_ads_report_rows(
+    advertised: list[dict],
+    purchased: list[dict],
+    search_terms: list[dict],
+    targeting: list[dict],
+    placement: list[dict],
+) -> dict[str, list[ReportCampaignRow]]:
+    """Return map key 'ASIN|||keyword' -> campaign/ad group rows from combined Amazon ads report rows."""
 
     asins_by_campaign_adgroup: dict[tuple[str, str], set[str]] = {}
     asins_by_campaign: dict[str, set[str]] = {}
-    for row in advertised:
+    for row in advertised + purchased:
         asin = _norm_text(_row_get(row, "Advertised ASIN")).upper()
         campaign = _norm_text(_row_get(row, "Campaign Name"))
         ad_group = _norm_text(_row_get(row, "Ad Group Name"))
@@ -953,7 +1006,7 @@ def _parse_full_ads_workbook(content: bytes) -> dict[str, list[ReportCampaignRow
             placement_top_orders=top.get("orders"),
         )
         for asin in asins_for(campaign, ad_group):
-            raw_rows.append((asin, _norm_key(keyword), campaign_row))
+            raw_rows.append((asin, _keyword_key(keyword), campaign_row))
 
     for row in targeting:
         campaign = _norm_text(_row_get(row, "Campaign Name"))
@@ -985,7 +1038,7 @@ def _parse_full_ads_workbook(content: bytes) -> dict[str, list[ReportCampaignRow
             placement_top_orders=top.get("orders"),
         )
         for asin in asins_for(campaign, ad_group):
-            raw_rows.append((asin, _norm_key(keyword), campaign_row))
+            raw_rows.append((asin, _keyword_key(keyword), campaign_row))
 
     grouped: dict[str, dict[tuple[str, str, str, str], list[ReportCampaignRow]]] = {}
     for asin, keyword, row in raw_rows:
@@ -1021,6 +1074,18 @@ def _parse_full_ads_workbook(content: bytes) -> dict[str, list[ReportCampaignRow
                 placement_top_orders=next((r.placement_top_orders for r in rows if r.placement_top_orders is not None), None),
             ))
     return result
+
+
+def _parse_full_ads_workbook(content: bytes) -> dict[str, list[ReportCampaignRow]]:
+    """Return map key 'ASIN|||keyword' -> campaign/ad group rows from full Amazon ads workbook."""
+    sheets = _extract_ads_report_sheets(content)
+    return _parse_ads_report_rows(
+        sheets["advertised"],
+        sheets["purchased"],
+        sheets["search_terms"],
+        sheets["targeting"],
+        sheets["placement"],
+    )
 
 
 def _merge_ads_maps(maps: list[dict[str, list[ReportCampaignRow]]]) -> dict[str, list[ReportCampaignRow]]:
@@ -1099,23 +1164,39 @@ async def full_report_analysis(
     if not entries:
         raise HTTPException(status_code=400, detail="No valid ASIN + search term rows found in filter file.")
 
-    parsed_maps = []
+    combined_sheets = {
+        "advertised": [],
+        "purchased": [],
+        "search_terms": [],
+        "targeting": [],
+        "placement": [],
+    }
+    parsed_file_count = 0
     parse_errors = []
     for uploaded in all_ads_files:
         ads_name = uploaded.filename or "ads workbook"
         try:
-            parsed = _parse_full_ads_workbook(await uploaded.read())
-            if parsed:
-                parsed_maps.append(parsed)
+            sheets = _extract_ads_report_sheets(await uploaded.read())
+            if any(sheets.values()):
+                parsed_file_count += 1
+                for key, rows in sheets.items():
+                    combined_sheets[key].extend(rows)
             else:
-                parse_errors.append(f"{ads_name}: no usable Search Term/Targeting data found")
+                parse_errors.append(f"{ads_name}: no recognized Amazon Ads report columns found")
         except Exception as e:
             parse_errors.append(f"{ads_name}: {e}")
 
-    ads_map = _merge_ads_maps(parsed_maps)
+    ads_map = _parse_ads_report_rows(
+        combined_sheets["advertised"],
+        combined_sheets["purchased"],
+        combined_sheets["search_terms"],
+        combined_sheets["targeting"],
+        combined_sheets["placement"],
+    )
     if not ads_map:
         details = "; ".join(parse_errors[:5]) if parse_errors else "No usable ad rows found."
-        raise HTTPException(status_code=400, detail=f"Could not parse usable campaign/search term data from uploaded ads workbook(s). {details}")
+        sheet_counts = ", ".join(f"{key}={len(rows)}" for key, rows in combined_sheets.items())
+        raise HTTPException(status_code=400, detail=f"Could not parse usable campaign/search term data from uploaded ads workbook(s). {details} Parsed rows: {sheet_counts}.")
 
     rank_results = []
     keyword_groups = []
@@ -1131,7 +1212,7 @@ async def full_report_analysis(
             for ranking in rankings:
                 if not ranking.get("found"):
                     continue
-                key = f"{asin}|||{_norm_key(ranking.get('term'))}"
+                key = f"{asin}|||{_keyword_key(ranking.get('term'))}"
                 campaigns = ads_map.get(key, [])
                 if campaigns:
                     keyword_groups.append(ReportKeyword(
@@ -1154,7 +1235,7 @@ async def full_report_analysis(
     analysis.update({
         "rank_results": rank_results,
         "matched_groups": len(keyword_groups),
-        "ads_files_parsed": len(parsed_maps),
+        "ads_files_parsed": parsed_file_count,
     })
     return analysis
 
