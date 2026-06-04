@@ -1200,6 +1200,11 @@ async def full_report_analysis(
 
     rank_results = []
     keyword_groups = []
+    found_rank_count = 0
+    keyword_only_matches = 0
+    asin_only_matches = 0
+    ads_asins = {key.split("|||", 1)[0] for key in ads_map}
+    ads_keywords = {key.split("|||", 1)[1] for key in ads_map if "|||" in key}
     async with httpx.AsyncClient() as client:
         for entry in entries:
             asin = entry["asin"]
@@ -1212,6 +1217,7 @@ async def full_report_analysis(
             for ranking in rankings:
                 if not ranking.get("found"):
                     continue
+                found_rank_count += 1
                 key = f"{asin}|||{_keyword_key(ranking.get('term'))}"
                 campaigns = ads_map.get(key, [])
                 if campaigns:
@@ -1221,14 +1227,34 @@ async def full_report_analysis(
                         organic_rank=ranking["position"],
                         campaigns=campaigns[:12],
                     ))
+                else:
+                    term_key = _keyword_key(ranking.get("term"))
+                    if term_key in ads_keywords:
+                        keyword_only_matches += 1
+                    if asin in ads_asins:
+                        asin_only_matches += 1
 
     if not keyword_groups:
+        reasons = []
+        if found_rank_count == 0:
+            reasons.append("No uploaded keywords were found organically in the checked Amazon result pages.")
+        if not combined_sheets["advertised"]:
+            reasons.append("No Advertised Product rows were uploaded, so campaign/ad group to ASIN mapping may be incomplete. Upload the Sponsored Products Advertised Product report or the full multi-tab Sponsored Products workbook.")
+        if keyword_only_matches > 0 and asin_only_matches == 0:
+            reasons.append("Some keywords exist in the ads report, but the ASINs from your ranking file do not match the ASINs mapped in the ads reports.")
+        elif asin_only_matches > 0 and keyword_only_matches == 0:
+            reasons.append("Some ASINs exist in the ads report, but the exact keywords/search terms from your ranking file do not match the ads search terms.")
+        elif keyword_only_matches > 0 and asin_only_matches > 0:
+            reasons.append("The ads reports contain some matching ASINs and some matching keywords, but not the same ASIN + keyword pairs together.")
+        if not reasons:
+            reasons.append("Ads data was parsed, but no exact ASIN + keyword pair matched the organic ranking results.")
         return {
             "rows": [],
             "summaries": [],
             "rank_results": rank_results,
             "matched_groups": 0,
-            "message": "Organic rankings ran, but no matching ASIN+keyword campaign data was found in the workbook.",
+            "ads_files_parsed": parsed_file_count,
+            "message": "Organic rankings ran, but no matching ASIN+keyword campaign data was found. " + " ".join(reasons),
         }
 
     analysis = _run_report_ai(keyword_groups[:50], target_acos)
