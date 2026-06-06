@@ -3,6 +3,7 @@ import csv
 import io
 import asyncio
 import time
+import logging
 import httpx
 import anthropic
 from pathlib import Path
@@ -10,13 +11,14 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, JSONResponse
 from pydantic import BaseModel
 from typing import Optional
 
 load_dotenv(Path(__file__).parent / ".env", override=True)
 
 app = FastAPI(title="Amazon Rank Tracker")
+logger = logging.getLogger(__name__)
 
 app.add_middleware(
     CORSMiddleware,
@@ -37,6 +39,44 @@ AI_CONCURRENCY = max(1, int(os.getenv("AI_CONCURRENCY", "2")))
 
 _serpapi_semaphore = asyncio.Semaphore(SERPAPI_CONCURRENCY)
 _rank_cache: dict[tuple[str, str, str], tuple[float, dict]] = {}
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request, exc):
+    logger.exception("Unhandled error for %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": (
+                f"Internal server error ({type(exc).__name__}). "
+                "Please retry once; if it continues, check the server logs."
+            )
+        },
+    )
+
+
+def _anthropic_create_message(client: anthropic.Anthropic, **kwargs):
+    """Retry temporary Anthropic failures and return a useful API error."""
+    last_error = None
+    for attempt in range(3):
+        try:
+            return client.messages.create(**kwargs)
+        except Exception as exc:
+            last_error = exc
+            status = getattr(exc, "status_code", None)
+            retryable = status in {429, 500, 502, 503, 529} or status is None
+            if retryable and attempt < 2:
+                time.sleep(1.5 * (2 ** attempt))
+                continue
+            message = str(exc).strip() or type(exc).__name__
+            raise HTTPException(
+                status_code=502,
+                detail=f"Anthropic API error: {message[:500]}",
+            ) from exc
+    raise HTTPException(
+        status_code=502,
+        detail=f"Anthropic API error: {str(last_error)[:500]}",
+    )
 
 
 class AsinRequest(BaseModel):
@@ -187,7 +227,8 @@ Rules:
 - Avoid making every term a long-tail use-case phrase
 - Do not include the ASIN itself"""
 
-    message = client.messages.create(
+    message = _anthropic_create_message(
+        client,
         model="claude-sonnet-4-6",
         max_tokens=500,
         messages=[{"role": "user", "content": prompt}],
@@ -442,7 +483,8 @@ async def ppc_analyze(req: PPCAnalyzeRequest):
 
     def run_batch(batch: list[PPCKeyword]) -> list:
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-        message = client.messages.create(
+        message = _anthropic_create_message(
+            client,
             model="claude-sonnet-4-6",
             max_tokens=7000,
             system=PPC_SYSTEM_PROMPT,
@@ -600,7 +642,8 @@ async def ppc_vs_organic(req: PVORequest):
 
     def run_batch(batch: list[PVOKeyword]) -> list:
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-        msg = client.messages.create(
+        msg = _anthropic_create_message(
+            client,
             model="claude-sonnet-4-6",
             max_tokens=7000,
             system=PVO_SYSTEM_PROMPT,
@@ -1166,7 +1209,8 @@ async def _run_report_ai(keywords: list[ReportKeyword], target_acos: float) -> d
 
     def run_batch(batch: list[ReportKeyword]) -> tuple[list, list]:
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-        msg = client.messages.create(
+        msg = _anthropic_create_message(
+            client,
             model="claude-sonnet-4-6",
             max_tokens=7000,
             system=REPORT_SYSTEM_PROMPT,
