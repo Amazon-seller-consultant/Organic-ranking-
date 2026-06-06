@@ -367,21 +367,19 @@ async def _rank_entries(entries: list[dict]) -> list[dict]:
 
 @app.post("/api/check-rankings")
 async def check_rankings(req: RankingRequest):
-    if not SERPAPI_KEY:
-        raise HTTPException(status_code=500, detail="SERPAPI_KEY not configured.")
+    if not CANOPY_API_KEY and not SERPAPI_KEY:
+        raise HTTPException(status_code=500, detail="Neither CANOPY_API_KEY nor SERPAPI_KEY is configured.")
     if not req.terms:
         raise HTTPException(status_code=400, detail="No search terms provided.")
 
     asin = req.asin.strip().upper()
     marketplace = req.marketplace or "amazon.com"
-
     entries = [{
         "asin": asin,
         "marketplace": marketplace,
         "terms": [term.strip() for term in req.terms if term.strip()],
     }]
-    ranked = await _rank_entries(entries)
-    return {"asin": asin, "results": ranked[0]["rankings"]}
+    return {"asin": asin, "results": await _canopy_rank_entries(entries)}
 
 
 PPC_SYSTEM_PROMPT = """You are a senior Amazon PPC manager with deep expertise in organic ranking strategy, listing optimization, and advertising efficiency. You think strategically — never giving generic advice.
@@ -744,8 +742,8 @@ def parse_upload(content: bytes, filename: str) -> list[dict]:
 
 @app.post("/api/bulk-check")
 async def bulk_check(file: UploadFile = File(...)):
-    if not SERPAPI_KEY:
-        raise HTTPException(status_code=500, detail="SERPAPI_KEY not configured.")
+    if not CANOPY_API_KEY and not SERPAPI_KEY:
+        raise HTTPException(status_code=500, detail="Neither CANOPY_API_KEY nor SERPAPI_KEY is configured.")
 
     filename = file.filename or ""
     if not (filename.lower().endswith(".csv") or filename.lower().endswith((".xlsx", ".xlsm"))):
@@ -760,7 +758,18 @@ async def bulk_check(file: UploadFile = File(...)):
     if not entries:
         raise HTTPException(status_code=400, detail="No valid ASIN + search term rows found. Check the file format.")
 
-    return {"results": await _rank_entries(entries)}
+    flat_results = await _canopy_rank_entries(entries)
+    grouped = []
+    offset = 0
+    for entry in entries:
+        count = len(entry["terms"])
+        grouped.append({
+            "asin": entry["asin"],
+            "marketplace": entry["marketplace"],
+            "rankings": flat_results[offset:offset + count],
+        })
+        offset += count
+    return {"results": grouped}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1513,6 +1522,34 @@ def _canopy_is_sponsored(item: dict) -> bool:
     return False
 
 
+async def _serpapi_backup_rank(
+    client: httpx.AsyncClient,
+    asin: str,
+    term: str,
+    marketplace: str,
+    canopy_error: str,
+) -> dict:
+    if not SERPAPI_KEY:
+        raise HTTPException(
+            status_code=502,
+            detail=f"{canopy_error} SerpAPI backup is not configured.",
+        )
+    try:
+        result = await search_term_ranking(client, asin, term, marketplace)
+    except HTTPException as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"{canopy_error} SerpAPI backup also failed: {exc.detail}",
+        ) from exc
+    return {
+        "asin": asin.upper(),
+        "marketplace": marketplace,
+        **result,
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "provider": "SerpAPI backup",
+    }
+
+
 async def _canopy_rank(
     client: httpx.AsyncClient,
     asin: str,
@@ -1521,6 +1558,11 @@ async def _canopy_rank(
 ) -> dict:
     asin = asin.upper()
     checked_at = datetime.now(timezone.utc).isoformat()
+    if not CANOPY_API_KEY:
+        return await _serpapi_backup_rank(
+            client, asin, term, marketplace,
+            "Canopy API is not configured.",
+        )
 
     async with _canopy_semaphore:
         for page in range(1, CANOPY_MAX_PAGES + 1):
@@ -1539,20 +1581,23 @@ async def _canopy_rank(
                     timeout=45,
                 )
             except Exception as exc:
-                raise HTTPException(status_code=502, detail=f"Canopy API request failed: {exc}") from exc
+                return await _serpapi_backup_rank(
+                    client, asin, term, marketplace,
+                    f"Canopy API request failed: {exc}.",
+                )
 
             if response.status_code != 200:
-                raise HTTPException(
-                    status_code=502,
-                    detail=f"Canopy API error: {response.text[:400] or f'HTTP {response.status_code}'}",
+                return await _serpapi_backup_rank(
+                    client, asin, term, marketplace,
+                    f"Canopy API error: {response.text[:300] or f'HTTP {response.status_code}'}.",
                 )
             try:
                 data = response.json()
             except Exception as exc:
-                raise HTTPException(
-                    status_code=502,
-                    detail=f"Canopy API returned invalid JSON: {response.text[:300]}",
-                ) from exc
+                return await _serpapi_backup_rank(
+                    client, asin, term, marketplace,
+                    f"Canopy API returned invalid JSON: {response.text[:250]}.",
+                )
 
             results = _canopy_results(data)
             for index, item in enumerate(results, 1):
@@ -1572,6 +1617,7 @@ async def _canopy_rank(
                         "page": page,
                         "found": True,
                         "checked_at": checked_at,
+                        "provider": "Canopy",
                     }
             if not results:
                 break
@@ -1584,6 +1630,7 @@ async def _canopy_rank(
         "page": None,
         "found": False,
         "checked_at": checked_at,
+        "provider": "Canopy",
     }
 
 
@@ -1650,10 +1697,10 @@ async def seo_gap_analysis(
     advertised_file: UploadFile = File(...),
     rank_file: UploadFile = File(...),
 ):
-    if not CANOPY_API_KEY:
+    if not CANOPY_API_KEY and not SERPAPI_KEY:
         raise HTTPException(
             status_code=500,
-            detail="CANOPY_API_KEY not configured. Add it to .env locally and Railway Variables online.",
+            detail="Neither CANOPY_API_KEY nor SERPAPI_KEY is configured.",
         )
 
     target_name = targeting_file.filename or ""
@@ -1787,6 +1834,10 @@ async def seo_gap_analysis(
             "ranked": sum(1 for item in ranks if item["found"]),
             "ads_keywords": len(ads_lookup),
             "buckets": bucket_counts,
+            "providers": {
+                "canopy": sum(1 for item in ranks if item.get("provider") == "Canopy"),
+                "serpapi_backup": sum(1 for item in ranks if item.get("provider") == "SerpAPI backup"),
+            },
         },
     }
 

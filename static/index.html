@@ -1513,11 +1513,14 @@
 
       const summary = data.summary;
       const buckets = summary.buckets || {};
+      const providers = summary.providers || {};
       document.getElementById('seo-summary-bar').innerHTML = `
         <div class="summary-stat"><div class="val">${summary.asins}</div><div class="lbl">ASINs</div></div>
         <div class="summary-stat"><div class="val val-green">${summary.ranked}</div><div class="lbl">Ranked Terms</div></div>
         <div class="summary-stat"><div class="val" style="color:#60a5fa">${buckets['Paid Only'] || 0}</div><div class="lbl">Paid Only</div></div>
         <div class="summary-stat"><div class="val val-orange">${buckets['Organic Only'] || 0}</div><div class="lbl">Organic Only</div></div>
+        <div class="summary-stat"><div class="val">${providers.canopy || 0}</div><div class="lbl">Canopy Checks</div></div>
+        <div class="summary-stat"><div class="val val-orange">${providers.serpapi_backup || 0}</div><div class="lbl">SerpAPI Backups</div></div>
       `;
       document.getElementById('rank-csv-link').href = seoDownloadUrl(data.rank_report.csv_url);
       document.getElementById('rank-xlsx-link').href = seoDownloadUrl(data.rank_report.xlsx_url);
