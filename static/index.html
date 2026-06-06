@@ -1250,6 +1250,38 @@
     ? 'http://localhost:8000'
     : '';
 
+  async function readApiResponse(response, fallbackMessage = 'Request failed.') {
+    const raw = await response.text();
+    let data = null;
+    if (raw) {
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        if (!response.ok) throw new Error(raw.slice(0, 500));
+        throw new Error(`The server returned an invalid response: ${raw.slice(0, 300)}`);
+      }
+    }
+    if (!response.ok) {
+      throw new Error(data?.detail || data?.error || fallbackMessage);
+    }
+    return data || {};
+  }
+
+  async function fetchWithTimeout(url, options = {}, timeoutMs = 120000) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new Error('The analysis took too long. Try fewer ASINs/keywords or smaller report files.');
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   let currentASIN = '';
   let currentTitle = '';
   let currentMarketplace = 'amazon.com';
@@ -1283,8 +1315,7 @@
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ asin })
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Failed to fetch product.');
+      const data = await readApiResponse(res, 'Failed to fetch product.');
 
       currentASIN = data.asin;
       currentTitle = data.title;
@@ -1340,8 +1371,7 @@
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ asin: currentASIN, product_title: currentTitle })
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'AI suggestion failed.');
+      const data = await readApiResponse(res, 'AI suggestion failed.');
 
       let added = 0;
       data.terms.forEach(t => {
@@ -1425,8 +1455,7 @@
           marketplace: currentMarketplace
         })
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Ranking check failed.');
+      const data = await readApiResponse(res, 'Ranking check failed.');
 
       clearInterval(fakeInterval);
       fill.style.width = '100%';
@@ -1935,8 +1964,7 @@
       }
 
       const res = await fetch(`${API_BASE}/api/bulk-check`, { method: 'POST', body: formData });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Bulk check failed.');
+      const data = await readApiResponse(res, 'Bulk check failed.');
       clearInterval(iv);
       bulkResults = data.results;
 
@@ -1974,14 +2002,12 @@
             }),
           });
           clearInterval(pvcIv);
-          const pvcData = await pvcRes.json();
-          if (pvcRes.ok) {
-            bulkPVOResults = pvcData.results.map((r, i) => ({
-              ...r,
-              _asin: matchedKws[i]?._asin,
-              _matchedKw: matchedKws[i],
-            }));
-          }
+          const pvcData = await readApiResponse(pvcRes, 'PPC vs Organic analysis failed.');
+          bulkPVOResults = pvcData.results.map((r, i) => ({
+            ...r,
+            _asin: matchedKws[i]?._asin,
+            _matchedKw: matchedKws[i],
+          }));
         }
       }
 
@@ -2429,8 +2455,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ keywords, target_acos: targetAcos }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Analysis failed.');
+      const data = await readApiResponse(res, 'Analysis failed.');
 
       clearInterval(iv);
       fill.style.width = '100%';
@@ -2893,8 +2918,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Analysis failed.');
+      const data = await readApiResponse(res, 'Analysis failed.');
 
       clearInterval(iv);
       fill.style.width = '100%';
@@ -3170,13 +3194,12 @@
       reportAdsFiles.forEach(file => fd.append('ads_files', file));
       fd.append('target_acos', String(targetAcos));
 
-      const analysisRes = await fetch(`${API_BASE}/api/full-report-analysis`, {
+      const analysisRes = await fetchWithTimeout(`${API_BASE}/api/full-report-analysis`, {
         method: 'POST',
         body: fd,
-      });
+      }, 240000);
       clearInterval(iv);
-      const analysisData = await analysisRes.json();
-      if (!analysisRes.ok) throw new Error(analysisData.detail || 'Analysis failed.');
+      const analysisData = await readApiResponse(analysisRes, 'Analysis failed.');
       if (analysisData.message && !(analysisData.rows || []).length) throw new Error(analysisData.message);
 
       fill.style.width = '100%';
@@ -3303,8 +3326,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filename, rows }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Could not save CSV.');
+      const data = await readApiResponse(res, 'Could not save CSV.');
 
       status.className = 'status-msg status-info';
       status.innerHTML = `✓ CSV saved: <a href="${data.url}" target="_blank" style="color:var(--accent)">${escHtml(data.filename)}</a><br><code>${escHtml(data.path)}</code>`;

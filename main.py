@@ -2,6 +2,7 @@ import os
 import csv
 import io
 import asyncio
+import time
 import httpx
 import anthropic
 from pathlib import Path
@@ -30,6 +31,12 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 SERPAPI_BASE = "https://serpapi.com/search"
 MAX_PAGES = 3
 PAGE_SIZE = 16  # Amazon typically shows 16-24 results per page
+SERPAPI_CONCURRENCY = max(1, int(os.getenv("SERPAPI_CONCURRENCY", "6")))
+RANK_CACHE_TTL_SECONDS = max(0, int(os.getenv("RANK_CACHE_TTL_SECONDS", "21600")))
+AI_CONCURRENCY = max(1, int(os.getenv("AI_CONCURRENCY", "2")))
+
+_serpapi_semaphore = asyncio.Semaphore(SERPAPI_CONCURRENCY)
+_rank_cache: dict[tuple[str, str, str], tuple[float, dict]] = {}
 
 
 class AsinRequest(BaseModel):
@@ -206,51 +213,107 @@ Rules:
 async def search_term_ranking(client: httpx.AsyncClient, asin: str, term: str, marketplace: str) -> dict:
     """Search Amazon for a keyword and find the ASIN's position."""
     asin = asin.upper()
+    term = term.strip()
+    cache_key = (marketplace.lower(), asin, term.lower())
+    cached = _rank_cache.get(cache_key)
+    if cached and time.monotonic() - cached[0] < RANK_CACHE_TTL_SECONDS:
+        return dict(cached[1])
+
     position_overall = None
     found_page = None
 
-    for page_num in range(1, MAX_PAGES + 1):
-        params = {
-            "engine": "amazon",
-            "k": term,
-            "amazon_domain": marketplace,
-            "page": page_num,
-            "api_key": SERPAPI_KEY,
-        }
+    async with _serpapi_semaphore:
+        for page_num in range(1, MAX_PAGES + 1):
+            params = {
+                "engine": "amazon",
+                "k": term,
+                "amazon_domain": marketplace,
+                "page": page_num,
+                "api_key": SERPAPI_KEY,
+            }
 
-        try:
-            resp = await client.get(SERPAPI_BASE, params=params, timeout=30)
-            if resp.status_code != 200:
-                break
+            try:
+                resp = await client.get(SERPAPI_BASE, params=params, timeout=30)
+                if resp.status_code != 200:
+                    raise HTTPException(
+                        status_code=502,
+                        detail=f"SerpAPI error: {resp.text[:300] or f'HTTP {resp.status_code}'}",
+                    )
 
-            data = resp.json()
-            if "error" in data:
-                break
+                try:
+                    data = resp.json()
+                except Exception:
+                    raise HTTPException(
+                        status_code=502,
+                        detail=f"SerpAPI returned an invalid response: {resp.text[:300]}",
+                    )
+                if "error" in data:
+                    raise HTTPException(status_code=502, detail=f"SerpAPI error: {data['error']}")
 
-            organic = data.get("organic_results", [])
-            if not organic:
-                break
-
-            for item in organic:
-                item_asin = (item.get("asin") or "").upper()
-                if item_asin == asin:
-                    pos_in_page = item.get("position", organic.index(item) + 1)
-                    position_overall = (page_num - 1) * PAGE_SIZE + pos_in_page
-                    found_page = page_num
+                organic = data.get("organic_results", [])
+                if not organic:
                     break
 
-            if position_overall is not None:
-                break
+                for index, item in enumerate(organic, 1):
+                    item_asin = (item.get("asin") or "").upper()
+                    if item_asin == asin:
+                        pos_in_page = item.get("position", index)
+                        position_overall = (page_num - 1) * PAGE_SIZE + pos_in_page
+                        found_page = page_num
+                        break
 
-        except Exception:
-            break
+                if position_overall is not None:
+                    break
 
-    return {
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(status_code=502, detail=f"SerpAPI request failed: {e}")
+
+    result = {
         "term": term,
         "position": position_overall,
         "page": found_page,
         "found": position_overall is not None,
     }
+    if RANK_CACHE_TTL_SECONDS:
+        _rank_cache[cache_key] = (time.monotonic(), result)
+    return dict(result)
+
+
+async def _rank_entries(entries: list[dict]) -> list[dict]:
+    jobs = [
+        (entry_index, term_index, entry["asin"], entry["marketplace"], term)
+        for entry_index, entry in enumerate(entries)
+        for term_index, term in enumerate(entry["terms"])
+    ]
+    grouped = [[None] * len(entry["terms"]) for entry in entries]
+    unique_jobs = {}
+    for _, _, asin, marketplace, term in jobs:
+        key = (marketplace.lower(), asin.upper(), term.strip().lower())
+        unique_jobs.setdefault(key, (asin, marketplace, term))
+
+    limits = httpx.Limits(
+        max_connections=max(SERPAPI_CONCURRENCY * 2, 10),
+        max_keepalive_connections=max(SERPAPI_CONCURRENCY, 5),
+    )
+    async with httpx.AsyncClient(limits=limits, timeout=35) as client:
+        unique_rankings = await asyncio.gather(*[
+            search_term_ranking(client, asin, term, marketplace)
+            for asin, marketplace, term in unique_jobs.values()
+        ])
+    ranking_by_key = dict(zip(unique_jobs, unique_rankings))
+    for entry_index, term_index, asin, marketplace, term in jobs:
+        key = (marketplace.lower(), asin.upper(), term.strip().lower())
+        grouped[entry_index][term_index] = dict(ranking_by_key[key])
+    return [
+        {
+            "asin": entry["asin"],
+            "marketplace": entry["marketplace"],
+            "rankings": grouped[index],
+        }
+        for index, entry in enumerate(entries)
+    ]
 
 
 @app.post("/api/check-rankings")
@@ -263,15 +326,13 @@ async def check_rankings(req: RankingRequest):
     asin = req.asin.strip().upper()
     marketplace = req.marketplace or "amazon.com"
 
-    async with httpx.AsyncClient() as client:
-        tasks = [
-            search_term_ranking(client, asin, term.strip(), marketplace)
-            for term in req.terms
-            if term.strip()
-        ]
-        results = await asyncio.gather(*tasks)
-
-    return {"asin": asin, "results": list(results)}
+    entries = [{
+        "asin": asin,
+        "marketplace": marketplace,
+        "terms": [term.strip() for term in req.terms if term.strip()],
+    }]
+    ranked = await _rank_entries(entries)
+    return {"asin": asin, "results": ranked[0]["rankings"]}
 
 
 PPC_SYSTEM_PROMPT = """You are a senior Amazon PPC manager with deep expertise in organic ranking strategy, listing optimization, and advertising efficiency. You think strategically — never giving generic advice.
@@ -376,13 +437,11 @@ async def ppc_analyze(req: PPCAnalyzeRequest):
     if len(req.keywords) > 30:
         raise HTTPException(status_code=400, detail="Maximum 30 keywords per analysis.")
 
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-    all_results = []
-
-    # Process in batches so each response fits within the 8192-token output limit
     batches = [req.keywords[i:i + BATCH_SIZE] for i in range(0, len(req.keywords), BATCH_SIZE)]
+    semaphore = asyncio.Semaphore(AI_CONCURRENCY)
 
-    for batch in batches:
+    def run_batch(batch: list[PPCKeyword]) -> list:
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         message = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=7000,
@@ -391,14 +450,19 @@ async def ppc_analyze(req: PPCAnalyzeRequest):
         )
         raw = message.content[0].text.strip()
         try:
-            batch_results = _parse_raw_json(raw)
-            all_results.extend(batch_results)
+            return _parse_raw_json(raw)
         except Exception as e:
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to parse AI response for batch: {e}. Raw: {raw[:300]}"
             )
 
+    async def run_limited(batch: list[PPCKeyword]) -> list:
+        async with semaphore:
+            return await asyncio.to_thread(run_batch, batch)
+
+    batch_results = await asyncio.gather(*[run_limited(batch) for batch in batches])
+    all_results = [result for results in batch_results for result in results]
     return {"results": all_results}
 
 
@@ -531,11 +595,11 @@ async def ppc_vs_organic(req: PVORequest):
     if len(req.keywords) > 30:
         raise HTTPException(status_code=400, detail="Maximum 30 keywords per analysis.")
 
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-    all_results = []
-
     batches = [req.keywords[i:i + PVO_BATCH_SIZE] for i in range(0, len(req.keywords), PVO_BATCH_SIZE)]
-    for batch in batches:
+    semaphore = asyncio.Semaphore(AI_CONCURRENCY)
+
+    def run_batch(batch: list[PVOKeyword]) -> list:
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         msg = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=7000,
@@ -544,13 +608,19 @@ async def ppc_vs_organic(req: PVORequest):
         )
         raw = msg.content[0].text.strip()
         try:
-            all_results.extend(_parse_raw_json(raw))
+            return _parse_raw_json(raw)
         except Exception as e:
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to parse AI response: {e}. Raw: {raw[:300]}"
             )
 
+    async def run_limited(batch: list[PVOKeyword]) -> list:
+        async with semaphore:
+            return await asyncio.to_thread(run_batch, batch)
+
+    batch_results = await asyncio.gather(*[run_limited(batch) for batch in batches])
+    all_results = [result for results in batch_results for result in results]
     return {"results": all_results, "asin": req.asin}
 
 
@@ -627,23 +697,7 @@ async def bulk_check(file: UploadFile = File(...)):
     if not entries:
         raise HTTPException(status_code=400, detail="No valid ASIN + search term rows found. Check the file format.")
 
-    results = []
-    async with httpx.AsyncClient() as client:
-        for entry in entries:
-            asin = entry["asin"]
-            marketplace = entry["marketplace"]
-            tasks = [
-                search_term_ranking(client, asin, term, marketplace)
-                for term in entry["terms"]
-            ]
-            rankings = await asyncio.gather(*tasks)
-            results.append({
-                "asin": asin,
-                "marketplace": marketplace,
-                "rankings": list(rankings),
-            })
-
-    return {"results": results}
+    return {"results": await _rank_entries(entries)}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -942,6 +996,8 @@ def _parse_ads_report_rows(
     search_terms: list[dict],
     targeting: list[dict],
     placement: list[dict],
+    allowed_asins: Optional[set[str]] = None,
+    allowed_keywords: Optional[set[str]] = None,
 ) -> dict[str, list[ReportCampaignRow]]:
     """Return map key 'ASIN|||keyword' -> campaign/ad group rows from combined Amazon ads report rows."""
 
@@ -952,6 +1008,8 @@ def _parse_ads_report_rows(
         campaign = _norm_text(_row_get(row, "Campaign Name"))
         ad_group = _norm_text(_row_get(row, "Ad Group Name"))
         if not asin or not campaign:
+            continue
+        if allowed_asins is not None and asin not in allowed_asins:
             continue
         asins_by_campaign_adgroup.setdefault((_norm_key(campaign), _norm_key(ad_group)), set()).add(asin)
         asins_by_campaign.setdefault(_norm_key(campaign), set()).add(asin)
@@ -983,6 +1041,9 @@ def _parse_ads_report_rows(
         keyword = _norm_text(_row_get(row, "Customer Search Term", "Search Term", "Targeting"))
         if not keyword:
             continue
+        keyword_key = _keyword_key(keyword)
+        if allowed_keywords is not None and keyword_key not in allowed_keywords:
+            continue
         clicks = _num(_row_get(row, "Clicks"))
         impressions = _num(_row_get(row, "Impressions"))
         spend = _num(_row_get(row, "Spend"))
@@ -1006,13 +1067,16 @@ def _parse_ads_report_rows(
             placement_top_orders=top.get("orders"),
         )
         for asin in asins_for(campaign, ad_group):
-            raw_rows.append((asin, _keyword_key(keyword), campaign_row))
+            raw_rows.append((asin, keyword_key, campaign_row))
 
     for row in targeting:
         campaign = _norm_text(_row_get(row, "Campaign Name"))
         ad_group = _norm_text(_row_get(row, "Ad Group Name"))
         keyword = _norm_text(_row_get(row, "Targeting", "Target", "Keyword"))
         if not keyword:
+            continue
+        keyword_key = _keyword_key(keyword)
+        if allowed_keywords is not None and keyword_key not in allowed_keywords:
             continue
         clicks = _num(_row_get(row, "Clicks"))
         impressions = _num(_row_get(row, "Impressions"))
@@ -1038,7 +1102,7 @@ def _parse_ads_report_rows(
             placement_top_orders=top.get("orders"),
         )
         for asin in asins_for(campaign, ad_group):
-            raw_rows.append((asin, _keyword_key(keyword), campaign_row))
+            raw_rows.append((asin, keyword_key, campaign_row))
 
     grouped: dict[str, dict[tuple[str, str, str, str], list[ReportCampaignRow]]] = {}
     for asin, keyword, row in raw_rows:
@@ -1096,13 +1160,12 @@ def _merge_ads_maps(maps: list[dict[str, list[ReportCampaignRow]]]) -> dict[str,
     return merged
 
 
-def _run_report_ai(keywords: list[ReportKeyword], target_acos: float) -> dict:
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-    all_rows = []
-    all_summaries = []
-
+async def _run_report_ai(keywords: list[ReportKeyword], target_acos: float) -> dict:
     batches = [keywords[i:i + REPORT_BATCH_SIZE] for i in range(0, len(keywords), REPORT_BATCH_SIZE)]
-    for batch in batches:
+    semaphore = asyncio.Semaphore(AI_CONCURRENCY)
+
+    def run_batch(batch: list[ReportKeyword]) -> tuple[list, list]:
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         msg = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=7000,
@@ -1111,14 +1174,20 @@ def _run_report_ai(keywords: list[ReportKeyword], target_acos: float) -> dict:
         )
         raw = msg.content[0].text.strip()
         try:
-            rows, summaries = _report_json_parts(raw)
-            all_rows.extend(rows)
-            all_summaries.extend(summaries)
+            return _report_json_parts(raw)
         except Exception as e:
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to parse AI response: {e}. Raw: {raw[:300]}"
             )
+
+    async def run_limited(batch: list[ReportKeyword]) -> tuple[list, list]:
+        async with semaphore:
+            return await asyncio.to_thread(run_batch, batch)
+
+    parts = await asyncio.gather(*[run_limited(batch) for batch in batches])
+    all_rows = [row for rows, _ in parts for row in rows]
+    all_summaries = [summary for _, summaries in parts for summary in summaries]
     return {"rows": all_rows, "summaries": all_summaries}
 
 
@@ -1131,7 +1200,7 @@ async def report_analysis(req: ReportAnalysisRequest):
     if len(req.keywords) > 50:
         raise HTTPException(status_code=400, detail="Maximum 50 ASIN+keyword groups per analysis.")
 
-    return _run_report_ai(req.keywords, req.target_acos)
+    return await _run_report_ai(req.keywords, req.target_acos)
 
 
 @app.post("/api/full-report-analysis")
@@ -1186,53 +1255,54 @@ async def full_report_analysis(
         except Exception as e:
             parse_errors.append(f"{ads_name}: {e}")
 
+    requested_asins = {entry["asin"] for entry in entries}
+    requested_keywords = {
+        _keyword_key(term)
+        for entry in entries
+        for term in entry["terms"]
+    }
     ads_map = _parse_ads_report_rows(
         combined_sheets["advertised"],
         combined_sheets["purchased"],
         combined_sheets["search_terms"],
         combined_sheets["targeting"],
         combined_sheets["placement"],
+        allowed_asins=requested_asins,
+        allowed_keywords=requested_keywords,
     )
     if not ads_map:
         details = "; ".join(parse_errors[:5]) if parse_errors else "No usable ad rows found."
         sheet_counts = ", ".join(f"{key}={len(rows)}" for key, rows in combined_sheets.items())
         raise HTTPException(status_code=400, detail=f"Could not parse usable campaign/search term data from uploaded ads workbook(s). {details} Parsed rows: {sheet_counts}.")
 
-    rank_results = []
     keyword_groups = []
     found_rank_count = 0
     keyword_only_matches = 0
     asin_only_matches = 0
     ads_asins = {key.split("|||", 1)[0] for key in ads_map}
     ads_keywords = {key.split("|||", 1)[1] for key in ads_map if "|||" in key}
-    async with httpx.AsyncClient() as client:
-        for entry in entries:
-            asin = entry["asin"]
-            marketplace = entry["marketplace"]
-            rankings = await asyncio.gather(*[
-                search_term_ranking(client, asin, term, marketplace)
-                for term in entry["terms"]
-            ])
-            rank_results.append({"asin": asin, "marketplace": marketplace, "rankings": list(rankings)})
-            for ranking in rankings:
-                if not ranking.get("found"):
-                    continue
-                found_rank_count += 1
-                key = f"{asin}|||{_keyword_key(ranking.get('term'))}"
-                campaigns = ads_map.get(key, [])
-                if campaigns:
-                    keyword_groups.append(ReportKeyword(
-                        asin=asin,
-                        keyword=ranking["term"],
-                        organic_rank=ranking["position"],
-                        campaigns=campaigns[:12],
-                    ))
-                else:
-                    term_key = _keyword_key(ranking.get("term"))
-                    if term_key in ads_keywords:
-                        keyword_only_matches += 1
-                    if asin in ads_asins:
-                        asin_only_matches += 1
+    rank_results = await _rank_entries(entries)
+    for entry_result in rank_results:
+        asin = entry_result["asin"]
+        for ranking in entry_result["rankings"]:
+            if not ranking.get("found"):
+                continue
+            found_rank_count += 1
+            key = f"{asin}|||{_keyword_key(ranking.get('term'))}"
+            campaigns = ads_map.get(key, [])
+            if campaigns:
+                keyword_groups.append(ReportKeyword(
+                    asin=asin,
+                    keyword=ranking["term"],
+                    organic_rank=ranking["position"],
+                    campaigns=campaigns[:12],
+                ))
+            else:
+                term_key = _keyword_key(ranking.get("term"))
+                if term_key in ads_keywords:
+                    keyword_only_matches += 1
+                if asin in ads_asins:
+                    asin_only_matches += 1
 
     if not keyword_groups:
         reasons = []
@@ -1257,7 +1327,7 @@ async def full_report_analysis(
             "message": "Organic rankings ran, but no matching ASIN+keyword campaign data was found. " + " ".join(reasons),
         }
 
-    analysis = _run_report_ai(keyword_groups[:50], target_acos)
+    analysis = await _run_report_ai(keyword_groups[:50], target_acos)
     analysis.update({
         "rank_results": rank_results,
         "matched_groups": len(keyword_groups),
