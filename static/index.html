@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Amazon Rank Tracker</title>
+  <title>Amazon Ads Keyword + SEO Gap Analyzer</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -71,6 +71,14 @@
     }
     .mode-tab.active { background: var(--accent); color: #000; }
     .mode-tab:not(.active):hover { color: var(--text); }
+    .seo-upload-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+    @media (max-width: 760px) {
+      .seo-upload-grid { grid-template-columns: 1fr; }
+    }
 
     /* Steps */
     .step-indicator {
@@ -641,8 +649,8 @@
 <div class="header">
   <div class="header-icon">📦</div>
   <div>
-    <h1>Amazon Rank Tracker</h1>
-    <p>Find your ASIN's organic position for any search term</p>
+    <h1>Amazon Ads Keyword + SEO Gap Analyzer</h1>
+    <p>Live organic rank tracking and actionable paid-versus-organic keyword gaps</p>
   </div>
 </div>
 
@@ -790,118 +798,77 @@
 
   <!-- Bulk Upload mode -->
   <div id="mode-bulk" class="hidden">
-
-    <!-- Upload card -->
     <div class="card">
-      <div class="card-title">Upload Files</div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-
-        <!-- Zone 1: Ranking file (required) -->
-        <div>
-          <div style="font-size:13px;font-weight:600;margin-bottom:8px;">
-            1. ASIN &amp; Search Terms
-            <span style="color:var(--danger);font-weight:400;font-size:12px;"> required</span>
-          </div>
-          <div class="drop-zone" id="drop-zone"
-            onclick="document.getElementById('bulk-file-input').click()"
-            ondragover="event.preventDefault();this.classList.add('drag-over')"
-            ondragleave="this.classList.remove('drag-over')"
-            ondrop="handleDrop(event)" style="padding:28px 16px;">
-            <input type="file" id="bulk-file-input" accept=".csv,.xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12" onchange="handleFileSelect(event)" />
-            <div class="drop-zone-icon" style="font-size:28px;margin-bottom:8px;">📄</div>
-            <h3 style="font-size:14px;">Drop CSV or Excel here</h3>
-            <p style="font-size:12px;">.csv and .xlsx supported</p>
-          </div>
-          <div class="template-row" style="margin-top:10px;">
-            <button class="btn btn-secondary" style="font-size:12px;padding:7px 12px;" onclick="downloadTemplate('xlsx')">⬇ Excel Template</button>
-            <button class="btn btn-secondary" style="font-size:12px;padding:7px 12px;" onclick="downloadTemplate('csv')">⬇ CSV Template</button>
-          </div>
-          <p style="font-size:11px;color:var(--text-muted);line-height:1.5;margin-top:8px;">
-            In the Codex in-app browser, downloads may be blocked. The templates are already saved at
-            <code>static/asin_rank_template.xlsx</code> and <code>static/asin_rank_template.csv</code>.
-          </p>
-        </div>
-
-        <!-- Zone 2: Amazon Ads report (optional) -->
-        <div>
-          <div style="font-size:13px;font-weight:600;margin-bottom:8px;">
-            2. Amazon Ads Target/Search Term Report
-            <span style="color:var(--text-muted);font-weight:400;font-size:12px;"> optional — adds PPC vs Organic analysis</span>
-          </div>
-          <div class="drop-zone" id="bulk-ads-zone"
-            onclick="document.getElementById('bulk-ads-input').click()"
-            ondragover="event.preventDefault();this.classList.add('drag-over')"
-            ondragleave="this.classList.remove('drag-over')"
-            ondrop="handleBulkAdsDrop(event)" style="padding:28px 16px;">
-            <input type="file" id="bulk-ads-input" accept=".csv" onchange="handleBulkAdsFile(event)" />
-            <div class="drop-zone-icon" style="font-size:28px;margin-bottom:8px;" id="bulk-ads-icon">📊</div>
-            <h3 style="font-size:14px;" id="bulk-ads-title">Drop Amazon Target/Search Term CSV</h3>
-            <p style="font-size:12px;" id="bulk-ads-sub">Optional PPC vs Organic comparison · .csv only</p>
-          </div>
-          <div id="bulk-ads-status" class="status-msg status-info hidden" style="margin-top:10px;font-size:12px;"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- File preview card -->
-    <div class="card hidden" id="bulk-preview-card">
-      <div class="card-title" id="bulk-preview-title">File Preview</div>
-      <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">
-        Showing the ASINs and search terms parsed from your file. Remove any row you don't need before running.
-      </p>
-      <div style="overflow-x:auto;">
-        <table class="preview-table">
-          <thead>
-            <tr><th>ASIN</th><th>Marketplace</th><th>Search Terms</th><th></th></tr>
-          </thead>
-          <tbody id="bulk-preview-body"></tbody>
-        </table>
+      <div class="card-title">Amazon Ads Keyword + SEO Gap Analyzer</div>
+      <div style="font-size:13px;color:var(--text-muted);margin-bottom:18px;">
+        Upload all three files. The analyzer joins ads targets to ASINs, checks live organic positions with Canopy, and creates rank and SEO gap reports.
       </div>
 
-      <!-- Ads report info row (shown when ads report is loaded) -->
-      <div id="bulk-ads-info-row" class="hidden" style="margin-top:16px;padding:12px 14px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.25);border-radius:var(--radius-sm);display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-        <span style="font-size:13px;color:#a78bfa;">⚔️ PPC vs Organic analysis enabled</span>
-        <span id="bulk-ads-info-text" style="font-size:13px;color:var(--text-muted);"></span>
-        <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
-          <label style="font-size:12px;color:var(--text-muted);">Target ACoS (%):</label>
-          <input type="number" id="bulk-target-acos" placeholder="e.g. 25" min="1" max="200" step="0.1"
-            style="width:90px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px;color:var(--text);font-size:13px;outline:none;" />
+      <div class="seo-upload-grid">
+        <div>
+          <div style="font-size:13px;font-weight:700;margin-bottom:7px;">1. Targeting Report</div>
+          <div class="drop-zone" onclick="document.getElementById('seo-targeting-input').click()" style="padding:24px 12px;">
+            <input type="file" id="seo-targeting-input" accept=".xlsx,.xlsm" onchange="setSeoFile('targeting', event)" />
+            <div style="font-size:28px;">🎯</div>
+            <h3 id="seo-targeting-name" style="font-size:13px;margin-top:7px;">Select Targeting XLSX</h3>
+            <p style="font-size:11px;">Broad, Phrase, Exact with orders</p>
+          </div>
         </div>
-        <button class="btn btn-danger" style="font-size:12px;padding:5px 10px;" onclick="clearBulkAds()">Remove report</button>
+        <div>
+          <div style="font-size:13px;font-weight:700;margin-bottom:7px;">2. Advertised Products</div>
+          <div class="drop-zone" onclick="document.getElementById('seo-advertised-input').click()" style="padding:24px 12px;">
+            <input type="file" id="seo-advertised-input" accept=".xlsx,.xlsm" onchange="setSeoFile('advertised', event)" />
+            <div style="font-size:28px;">📦</div>
+            <h3 id="seo-advertised-name" style="font-size:13px;margin-top:7px;">Select Advertised Products XLSX</h3>
+            <p style="font-size:11px;">Maps campaigns and ad groups to ASINs</p>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:700;margin-bottom:7px;">3. ASIN Rank Template</div>
+          <div class="drop-zone" onclick="document.getElementById('seo-rank-input').click()" style="padding:24px 12px;">
+            <input type="file" id="seo-rank-input" accept=".csv,.xlsx,.xlsm" onchange="setSeoFile('rank', event)" />
+            <div style="font-size:28px;">🔎</div>
+            <h3 id="seo-rank-name" style="font-size:13px;margin-top:7px;">Select Rank Template</h3>
+            <p style="font-size:11px;">ASIN, Marketplace, Search Term 1–216</p>
+          </div>
+        </div>
       </div>
 
       <div style="margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-        <button class="btn btn-primary btn-lg" id="bulk-run-btn" onclick="runBulkCheck()">
-          🔍 Check Rankings
+        <button class="btn btn-primary btn-lg" id="seo-run-btn" onclick="runSeoGapAnalysis()" disabled>
+          Run Rank + Gap Analysis
         </button>
-        <button class="btn btn-secondary" onclick="clearBulk()">Clear All</button>
-        <span id="bulk-count-label" style="font-size:13px;color:var(--text-muted);"></span>
+        <button class="btn btn-secondary" onclick="clearSeoFiles()">Clear</button>
+        <button class="btn btn-secondary" onclick="downloadTemplate('xlsx')">Excel Template</button>
+        <button class="btn btn-secondary" onclick="downloadTemplate('csv')">CSV Template</button>
       </div>
-      <div id="bulk-progress-container" class="hidden" style="margin-top:16px;">
-        <div class="progress-bar"><div class="progress-fill" id="bulk-progress-fill" style="width:0%"></div></div>
-        <div class="progress-text" id="bulk-progress-text">Checking rankings…</div>
+      <div id="seo-progress" class="hidden" style="margin-top:16px;">
+        <div class="progress-bar"><div class="progress-fill" id="seo-progress-fill" style="width:0%"></div></div>
+        <div class="progress-text" id="seo-progress-text">Preparing files...</div>
       </div>
-      <div id="bulk-error" class="status-msg status-error hidden"></div>
+      <div id="seo-error" class="status-msg status-error hidden"></div>
     </div>
 
-    <!-- Bulk results card -->
-    <div class="card hidden" id="bulk-results-card">
-      <div class="card-title" id="bulk-results-title">Bulk Ranking Results</div>
-      <div class="summary-bar" id="bulk-summary-bar"></div>
-      <div class="export-row" id="bulk-export-row">
-        <button class="btn btn-secondary" onclick="exportBulkCSV()">⬇ Export Rankings CSV</button>
-        <button class="btn btn-secondary hidden" id="bulk-pvo-export-btn" onclick="exportBulkPVOCSV()">⬇ Export PPC Analysis CSV</button>
-      </div>
-      <div id="bulk-results-body"></div>
-
-      <!-- PPC vs Organic results section -->
-      <div id="bulk-pvo-section" class="hidden" style="margin-top:8px;">
-        <div style="border-top:1px solid var(--border);margin:20px 0 16px;"></div>
-        <div style="font-size:16px;font-weight:700;margin-bottom:6px;">⚔️ PPC vs Organic Analysis</div>
-        <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;" id="bulk-pvo-desc"></p>
-        <div class="summary-bar" id="bulk-pvo-summary-bar" style="margin-bottom:16px;"></div>
-        <div id="bulk-pvo-results-body"></div>
+    <div class="card hidden" id="seo-results-card">
+      <div class="card-title">Analysis Complete</div>
+      <div class="summary-bar" id="seo-summary-bar"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px;">
+        <div style="border:1px solid var(--border);padding:16px;border-radius:var(--radius-sm);">
+          <div style="font-weight:700;margin-bottom:5px;">Rank Report</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Live organic rank snapshot for every ASIN × search term.</div>
+          <div style="display:flex;gap:8px;">
+            <a class="btn btn-secondary" id="rank-csv-link" download>CSV</a>
+            <a class="btn btn-primary" id="rank-xlsx-link" download>Excel</a>
+          </div>
+        </div>
+        <div style="border:1px solid var(--border);padding:16px;border-radius:var(--radius-sm);">
+          <div style="font-weight:700;margin-bottom:5px;">SEO Gap Report</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Winning, Paid Only, Organic Only, Gap, and priority scores.</div>
+          <div style="display:flex;gap:8px;">
+            <a class="btn btn-secondary" id="gap-csv-link" download>CSV</a>
+            <a class="btn btn-primary" id="gap-xlsx-link" download>Excel</a>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1472,7 +1439,103 @@
   let bulkResults    = [];
   let bulkAdsRows    = []; // parsed PPC/Target Report rows
   let bulkPVOResults = [];
+  const seoFiles = { targeting: null, advertised: null, rank: null };
 
+  function setSeoFile(type, event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    seoFiles[type] = file;
+    const label = document.getElementById(`seo-${type}-name`);
+    label.textContent = file.name;
+    label.style.color = 'var(--success)';
+    document.getElementById('seo-run-btn').disabled =
+      !(seoFiles.targeting && seoFiles.advertised && seoFiles.rank);
+    hideEl('seo-error');
+  }
+
+  function clearSeoFiles() {
+    seoFiles.targeting = null;
+    seoFiles.advertised = null;
+    seoFiles.rank = null;
+    ['targeting', 'advertised', 'rank'].forEach(type => {
+      document.getElementById(`seo-${type}-input`).value = '';
+      document.getElementById(`seo-${type}-name`).style.color = '';
+    });
+    document.getElementById('seo-targeting-name').textContent = 'Select Targeting XLSX';
+    document.getElementById('seo-advertised-name').textContent = 'Select Advertised Products XLSX';
+    document.getElementById('seo-rank-name').textContent = 'Select Rank Template';
+    document.getElementById('seo-run-btn').disabled = true;
+    hideEl('seo-results-card');
+    hideEl('seo-error');
+    hideEl('seo-progress');
+  }
+
+  function seoDownloadUrl(path) {
+    return path.startsWith('http') ? path : `${API_BASE}${path}`;
+  }
+
+  async function runSeoGapAnalysis() {
+    if (!(seoFiles.targeting && seoFiles.advertised && seoFiles.rank)) return;
+    const button = document.getElementById('seo-run-btn');
+    const fill = document.getElementById('seo-progress-fill');
+    const text = document.getElementById('seo-progress-text');
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner"></span> Running...';
+    showEl('seo-progress');
+    hideEl('seo-results-card');
+    hideEl('seo-error');
+
+    let progress = 4;
+    const timer = setInterval(() => {
+      progress = Math.min(progress + 1.5, 90);
+      fill.style.width = `${progress}%`;
+      text.textContent = progress < 30
+        ? 'Joining targeting and advertised product reports...'
+        : progress < 78
+          ? 'Checking live Amazon organic rankings with Canopy...'
+          : 'Building rank and SEO gap reports...';
+    }, 700);
+
+    try {
+      const form = new FormData();
+      form.append('targeting_file', seoFiles.targeting);
+      form.append('advertised_file', seoFiles.advertised);
+      form.append('rank_file', seoFiles.rank);
+      const response = await fetchWithTimeout(`${API_BASE}/api/seo-gap-analysis`, {
+        method: 'POST',
+        body: form,
+      }, 600000);
+      const data = await readApiResponse(response, 'SEO gap analysis failed.');
+
+      clearInterval(timer);
+      fill.style.width = '100%';
+      text.textContent = 'Reports are ready.';
+
+      const summary = data.summary;
+      const buckets = summary.buckets || {};
+      document.getElementById('seo-summary-bar').innerHTML = `
+        <div class="summary-stat"><div class="val">${summary.asins}</div><div class="lbl">ASINs</div></div>
+        <div class="summary-stat"><div class="val val-green">${summary.ranked}</div><div class="lbl">Ranked Terms</div></div>
+        <div class="summary-stat"><div class="val" style="color:#60a5fa">${buckets['Paid Only'] || 0}</div><div class="lbl">Paid Only</div></div>
+        <div class="summary-stat"><div class="val val-orange">${buckets['Organic Only'] || 0}</div><div class="lbl">Organic Only</div></div>
+      `;
+      document.getElementById('rank-csv-link').href = seoDownloadUrl(data.rank_report.csv_url);
+      document.getElementById('rank-xlsx-link').href = seoDownloadUrl(data.rank_report.xlsx_url);
+      document.getElementById('gap-csv-link').href = seoDownloadUrl(data.seo_gap_report.csv_url);
+      document.getElementById('gap-xlsx-link').href = seoDownloadUrl(data.seo_gap_report.xlsx_url);
+      showEl('seo-results-card');
+      document.getElementById('seo-results-card').scrollIntoView({ behavior: 'smooth' });
+    } catch (error) {
+      clearInterval(timer);
+      const element = document.getElementById('seo-error');
+      element.textContent = '⚠ ' + error.message;
+      showEl('seo-error');
+    } finally {
+      setTimeout(() => hideEl('seo-progress'), 500);
+      button.disabled = false;
+      button.textContent = 'Run Rank + Gap Analysis';
+    }
+  }
 
   function handleDrop(e) {
     e.preventDefault();

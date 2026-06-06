@@ -4,6 +4,9 @@ import io
 import asyncio
 import time
 import logging
+import math
+from datetime import datetime, timezone
+from uuid import uuid4
 import httpx
 import anthropic
 from pathlib import Path
@@ -29,6 +32,7 @@ app.add_middleware(
 
 SERPAPI_KEY = os.getenv("SERPAPI_KEY", "")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+CANOPY_API_KEY = os.getenv("CANOPY_API_KEY", "")
 
 SERPAPI_BASE = "https://serpapi.com/search"
 MAX_PAGES = 3
@@ -36,8 +40,12 @@ PAGE_SIZE = 16  # Amazon typically shows 16-24 results per page
 SERPAPI_CONCURRENCY = max(1, int(os.getenv("SERPAPI_CONCURRENCY", "6")))
 RANK_CACHE_TTL_SECONDS = max(0, int(os.getenv("RANK_CACHE_TTL_SECONDS", "21600")))
 AI_CONCURRENCY = max(1, int(os.getenv("AI_CONCURRENCY", "2")))
+CANOPY_CONCURRENCY = max(1, int(os.getenv("CANOPY_CONCURRENCY", "5")))
+CANOPY_MAX_PAGES = max(1, int(os.getenv("CANOPY_MAX_PAGES", "3")))
+CANOPY_SEARCH_URL = "https://api.canopyapi.co/v1/amazon/search"
 
 _serpapi_semaphore = asyncio.Semaphore(SERPAPI_CONCURRENCY)
+_canopy_semaphore = asyncio.Semaphore(CANOPY_CONCURRENCY)
 _rank_cache: dict[tuple[str, str, str], tuple[float, dict]] = {}
 
 
@@ -708,6 +716,8 @@ def parse_upload(content: bytes, filename: str) -> list[dict]:
     # Skip header row
     data_rows = raw_rows[1:]
 
+    merged: dict[tuple[str, str], list[str]] = {}
+    seen_terms: dict[tuple[str, str], set[str]] = {}
     for row in data_rows:
         if not row:
             continue
@@ -717,7 +727,17 @@ def parse_upload(content: bytes, filename: str) -> list[dict]:
         marketplace = row[1].strip() if len(row) > 1 and row[1].strip() else "amazon.com"
         terms = [t.strip() for t in row[2:] if len(row) > 2 and t.strip()]
         if asin and terms:
-            rows.append({"asin": asin, "marketplace": marketplace, "terms": terms})
+            key = (asin, marketplace)
+            merged.setdefault(key, [])
+            seen_terms.setdefault(key, set())
+            for term in terms:
+                term_key = " ".join(term.lower().split())
+                if term_key not in seen_terms[key]:
+                    seen_terms[key].add(term_key)
+                    merged[key].append(term)
+
+    for (asin, marketplace), terms in merged.items():
+        rows.append({"asin": asin, "marketplace": marketplace, "terms": terms})
 
     return rows
 
@@ -1378,6 +1398,397 @@ async def full_report_analysis(
         "ads_files_parsed": parsed_file_count,
     })
     return analysis
+
+
+def _first_worksheet_rows(content: bytes) -> list[dict]:
+    from openpyxl import load_workbook
+
+    wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+    try:
+        for ws in wb.worksheets:
+            rows = _worksheet_dicts(ws)
+            if rows:
+                return rows
+        return []
+    finally:
+        wb.close()
+
+
+def _parse_seo_ads_rows(targeting_content: bytes, advertised_content: bytes) -> list[dict]:
+    advertised_rows = _first_worksheet_rows(advertised_content)
+    targeting_rows = _first_worksheet_rows(targeting_content)
+
+    asin_map: dict[tuple[str, str], set[str]] = {}
+    for row in advertised_rows:
+        campaign = _norm_key(_row_get(row, "Campaign Name", "Campaign"))
+        ad_group = _norm_key(_row_get(row, "Ad Group Name", "Ad Group"))
+        asin = _norm_text(_row_get(row, "Advertised ASIN")).upper()
+        if campaign and asin:
+            asin_map.setdefault((campaign, ad_group), set()).add(asin)
+
+    aggregated: dict[tuple[str, str, str], dict] = {}
+    valid_match_types = {"BROAD", "PHRASE", "EXACT"}
+    for row in targeting_rows:
+        match_type = _norm_text(_row_get(row, "Match Type")).upper()
+        keyword = _norm_text(_row_get(row, "Targeting", "Target", "Keyword"))
+        orders = _num(_row_get(row, "7 Day Total Orders (#)", "7 Day Total Orders", "Orders"))
+        if match_type not in valid_match_types or orders <= 0:
+            continue
+        if not keyword or keyword in {"-", "*"} or "placeholder keyword" in keyword.lower():
+            continue
+
+        campaign = _norm_key(_row_get(row, "Campaign Name", "Campaign"))
+        ad_group = _norm_key(_row_get(row, "Ad Group Name", "Ad Group"))
+        asins = asin_map.get((campaign, ad_group), set())
+        if not asins:
+            continue
+
+        impressions = _num(_row_get(row, "Impressions"))
+        clicks = _num(_row_get(row, "Clicks"))
+        spend = _num(_row_get(row, "Spend"))
+        sales = _num(_row_get(row, "7 Day Total Sales", "Sales"))
+        keyword_key = _keyword_key(keyword)
+
+        for asin in asins:
+            key = (asin, keyword_key, match_type)
+            item = aggregated.setdefault(key, {
+                "asin": asin,
+                "keyword": keyword.strip(),
+                "keyword_key": keyword_key,
+                "match_type": match_type,
+                "impressions": 0.0,
+                "clicks": 0.0,
+                "spend": 0.0,
+                "orders": 0.0,
+                "sales": 0.0,
+            })
+            item["impressions"] += impressions
+            item["clicks"] += clicks
+            item["spend"] += spend
+            item["orders"] += orders
+            item["sales"] += sales
+
+    return list(aggregated.values())
+
+
+def _marketplace_domain(marketplace: str) -> str:
+    mapping = {
+        "amazon.com": "US",
+        "amazon.co.uk": "UK",
+        "amazon.de": "DE",
+        "amazon.fr": "FR",
+        "amazon.it": "IT",
+        "amazon.es": "ES",
+        "amazon.ca": "CA",
+        "amazon.com.mx": "MX",
+        "amazon.com.br": "BR",
+        "amazon.in": "IN",
+        "amazon.co.jp": "JP",
+        "amazon.com.au": "AU",
+    }
+    value = marketplace.strip().lower().replace("www.", "")
+    return mapping.get(value, "US")
+
+
+def _canopy_results(data) -> list[dict]:
+    if isinstance(data, dict):
+        for key in ("searchResults", "search_results", "results", "products", "items"):
+            value = data.get(key)
+            if isinstance(value, list):
+                return [item for item in value if isinstance(item, dict)]
+        for value in data.values():
+            found = _canopy_results(value)
+            if found:
+                return found
+    return []
+
+
+def _canopy_is_sponsored(item: dict) -> bool:
+    for key in ("sponsored", "isSponsored", "is_sponsored", "sponsoredResult"):
+        value = item.get(key)
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str) and value.lower() in {"true", "yes", "sponsored"}:
+            return True
+    return False
+
+
+async def _canopy_rank(
+    client: httpx.AsyncClient,
+    asin: str,
+    term: str,
+    marketplace: str,
+) -> dict:
+    asin = asin.upper()
+    checked_at = datetime.now(timezone.utc).isoformat()
+
+    async with _canopy_semaphore:
+        for page in range(1, CANOPY_MAX_PAGES + 1):
+            try:
+                response = await client.get(
+                    CANOPY_SEARCH_URL,
+                    params={
+                        "searchTerm": term,
+                        "domain": _marketplace_domain(marketplace),
+                        "page": page,
+                    },
+                    headers={
+                        "API-KEY": CANOPY_API_KEY,
+                        "Authorization": f"Bearer {CANOPY_API_KEY}",
+                    },
+                    timeout=45,
+                )
+            except Exception as exc:
+                raise HTTPException(status_code=502, detail=f"Canopy API request failed: {exc}") from exc
+
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Canopy API error: {response.text[:400] or f'HTTP {response.status_code}'}",
+                )
+            try:
+                data = response.json()
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Canopy API returned invalid JSON: {response.text[:300]}",
+                ) from exc
+
+            results = _canopy_results(data)
+            for index, item in enumerate(results, 1):
+                if _canopy_is_sponsored(item):
+                    continue
+                item_asin = _norm_text(
+                    item.get("asin") or item.get("ASIN") or item.get("productAsin")
+                ).upper()
+                if item_asin == asin:
+                    raw_position = int(_num(item.get("position")) or index)
+                    rank = raw_position if raw_position > 20 else (page - 1) * 20 + raw_position
+                    return {
+                        "asin": asin,
+                        "marketplace": marketplace,
+                        "term": term,
+                        "position": rank,
+                        "page": page,
+                        "found": True,
+                        "checked_at": checked_at,
+                    }
+            if not results:
+                break
+
+    return {
+        "asin": asin,
+        "marketplace": marketplace,
+        "term": term,
+        "position": None,
+        "page": None,
+        "found": False,
+        "checked_at": checked_at,
+    }
+
+
+async def _canopy_rank_entries(entries: list[dict]) -> list[dict]:
+    jobs = [
+        (entry["asin"], entry["marketplace"], term)
+        for entry in entries
+        for term in entry["terms"]
+    ]
+    limits = httpx.Limits(
+        max_connections=max(CANOPY_CONCURRENCY * 2, 10),
+        max_keepalive_connections=max(CANOPY_CONCURRENCY, 5),
+    )
+    async with httpx.AsyncClient(limits=limits, timeout=50) as client:
+        return await asyncio.gather(*[
+            _canopy_rank(client, asin, term, marketplace)
+            for asin, marketplace, term in jobs
+        ])
+
+
+def _write_report_files(prefix: str, headers: list[str], rows: list[list]) -> dict:
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+
+    export_dir = Path(__file__).parent / "static" / "exports"
+    export_dir.mkdir(parents=True, exist_ok=True)
+    token = uuid4().hex[:8]
+    csv_name = f"{prefix}_{token}.csv"
+    xlsx_name = f"{prefix}_{token}.xlsx"
+
+    with (export_dir / csv_name).open("w", newline="", encoding="utf-8-sig") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(headers)
+        writer.writerows(rows)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = prefix[:31]
+    ws.append(headers)
+    for row in rows:
+        ws.append(row)
+    header_fill = PatternFill("solid", fgColor="FF9900")
+    for cell in ws[1]:
+        cell.font = Font(bold=True, color="000000")
+        cell.fill = header_fill
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = ws.dimensions
+    for column in ws.columns:
+        values = [str(cell.value or "") for cell in column[:200]]
+        ws.column_dimensions[column[0].column_letter].width = min(max(map(len, values), default=10) + 2, 45)
+    wb.save(export_dir / xlsx_name)
+
+    return {
+        "csv_url": f"/static/exports/{csv_name}",
+        "xlsx_url": f"/static/exports/{xlsx_name}",
+        "csv_name": csv_name,
+        "xlsx_name": xlsx_name,
+    }
+
+
+@app.post("/api/seo-gap-analysis")
+async def seo_gap_analysis(
+    targeting_file: UploadFile = File(...),
+    advertised_file: UploadFile = File(...),
+    rank_file: UploadFile = File(...),
+):
+    if not CANOPY_API_KEY:
+        raise HTTPException(
+            status_code=500,
+            detail="CANOPY_API_KEY not configured. Add it to .env locally and Railway Variables online.",
+        )
+
+    target_name = targeting_file.filename or ""
+    advertised_name = advertised_file.filename or ""
+    rank_name = rank_file.filename or ""
+    if not target_name.lower().endswith((".xlsx", ".xlsm")):
+        raise HTTPException(status_code=400, detail="Targeting Report must be XLSX or XLSM.")
+    if not advertised_name.lower().endswith((".xlsx", ".xlsm")):
+        raise HTTPException(status_code=400, detail="Advertised Products Report must be XLSX or XLSM.")
+    if not rank_name.lower().endswith((".csv", ".xlsx", ".xlsm")):
+        raise HTTPException(status_code=400, detail="ASIN Rank Template must be CSV, XLSX, or XLSM.")
+
+    entries = parse_upload(await rank_file.read(), rank_name)
+    if not entries:
+        raise HTTPException(status_code=400, detail="No valid ASIN + search terms found in the rank template.")
+
+    ads_rows = _parse_seo_ads_rows(
+        await targeting_file.read(),
+        await advertised_file.read(),
+    )
+    ranks = await _canopy_rank_entries(entries)
+
+    rank_headers = [
+        "ASIN", "Marketplace", "Search Term", "Organic Rank", "Rank Page", "Checked At"
+    ]
+    rank_rows = [
+        [
+            item["asin"],
+            item["marketplace"],
+            item["term"],
+            item["position"] if item["found"] else "Not ranked",
+            item["page"] if item["found"] else "",
+            item["checked_at"],
+        ]
+        for item in ranks
+    ]
+
+    rank_lookup = {
+        (item["asin"], _keyword_key(item["term"])): item
+        for item in ranks
+    }
+    marketplace_by_asin = {entry["asin"]: entry["marketplace"] for entry in entries}
+
+    ads_lookup: dict[tuple[str, str], dict] = {}
+    for row in ads_rows:
+        key = (row["asin"], row["keyword_key"])
+        item = ads_lookup.setdefault(key, {
+            **row,
+            "match_types": set(),
+            "impressions": 0.0,
+            "clicks": 0.0,
+            "spend": 0.0,
+            "orders": 0.0,
+            "sales": 0.0,
+        })
+        item["match_types"].add(row["match_type"])
+        for metric in ("impressions", "clicks", "spend", "orders", "sales"):
+            item[metric] += row[metric]
+
+    keyword_labels = {
+        (item["asin"], _keyword_key(item["term"])): item["term"] for item in ranks
+    }
+    for key, item in ads_lookup.items():
+        keyword_labels.setdefault(key, item["keyword"])
+
+    all_keys = set(keyword_labels)
+    gap_headers = [
+        "ASIN", "Keyword", "Match Type", "In Ads", "In Organic", "Organic Rank",
+        "Bucket", "Impressions", "Clicks", "CTR", "CVR", "Orders", "Sales",
+        "Spend", "ROAS", "Priority Score"
+    ]
+    gap_rows = []
+    bucket_counts = {"Winning": 0, "Paid Only": 0, "Organic Only": 0, "Gap": 0}
+    for asin, keyword_key in sorted(all_keys):
+        ad = ads_lookup.get((asin, keyword_key))
+        rank = rank_lookup.get((asin, keyword_key))
+        in_ads = ad is not None
+        in_organic = bool(rank and rank["found"])
+        if in_ads and in_organic:
+            bucket = "Winning"
+        elif in_ads:
+            bucket = "Paid Only"
+        elif in_organic:
+            bucket = "Organic Only"
+        else:
+            bucket = "Gap"
+        bucket_counts[bucket] += 1
+
+        impressions = ad["impressions"] if ad else None
+        clicks = ad["clicks"] if ad else None
+        spend = ad["spend"] if ad else None
+        orders = ad["orders"] if ad else None
+        sales = ad["sales"] if ad else None
+        ctr = (clicks / impressions * 100) if ad and impressions > 0 else None
+        cvr = (orders / clicks * 100) if ad and clicks > 0 else None
+        roas = (sales / spend) if ad and spend > 0 else None
+        priority = (
+            cvr * roas * math.log(impressions + 1)
+            if bucket == "Paid Only" and cvr is not None and roas is not None
+            else None
+        )
+
+        gap_rows.append([
+            asin,
+            keyword_labels[(asin, keyword_key)],
+            ", ".join(sorted(ad["match_types"])) if ad else "",
+            "YES" if in_ads else "NO",
+            "YES" if in_organic else "NO",
+            rank["position"] if in_organic else "Not ranked",
+            bucket,
+            round(impressions, 2) if impressions is not None else "",
+            round(clicks, 2) if clicks is not None else "",
+            round(ctr, 4) if ctr is not None else "",
+            round(cvr, 4) if cvr is not None else "",
+            round(orders, 2) if orders is not None else "",
+            round(sales, 2) if sales is not None else "",
+            round(spend, 2) if spend is not None else "",
+            round(roas, 4) if roas is not None else "",
+            round(priority, 4) if priority is not None else "",
+        ])
+
+    rank_files = _write_report_files("rank_report", rank_headers, rank_rows)
+    gap_files = _write_report_files("seo_gap_report", gap_headers, gap_rows)
+
+    return {
+        "rank_report": rank_files,
+        "seo_gap_report": gap_files,
+        "summary": {
+            "asins": len({entry["asin"] for entry in entries}),
+            "rank_checks": len(ranks),
+            "ranked": sum(1 for item in ranks if item["found"]),
+            "ads_keywords": len(ads_lookup),
+            "buckets": bucket_counts,
+        },
+    }
 
 
 @app.post("/api/save-csv")
