@@ -652,7 +652,6 @@
   <div class="mode-tabs">
     <button class="mode-tab active" id="tab-single" onclick="switchMode('single')">🔍 Single ASIN</button>
     <button class="mode-tab" id="tab-bulk" onclick="switchMode('bulk')">📂 Bulk Upload</button>
-    <button class="mode-tab" id="tab-report" onclick="switchMode('report')">📊 Ads Analyzer</button>
   </div>
 
   <!-- Single ASIN mode wrapper -->
@@ -907,132 +906,6 @@
     </div>
 
   </div><!-- end mode-bulk -->
-
-  <!-- ── Report Analysis Mode ─────────────────────────────────── -->
-  <div id="mode-report" class="hidden">
-
-    <!-- Upload card -->
-    <div class="card">
-      <div style="margin-bottom:18px">
-        <div class="card-title">📊 Amazon Ads Opportunity Analyzer</div>
-        <div style="font-size:13px;color:var(--text-muted);margin-top:4px">
-          Upload your ASIN & Search Terms filter file + full Amazon Sponsored Products workbook to compare campaigns, ad groups, match types, placements, and organic rank.
-        </div>
-      </div>
-
-      <div class="two-col-upload">
-        <!-- Left: ASIN & Search Terms filter -->
-        <div class="upload-col">
-          <div class="upload-col-header">
-            <span class="upload-col-num">1</span>
-            <div>
-              <div class="upload-col-title">ASIN & Search Terms</div>
-              <div class="upload-col-sub">CSV or XLSX · same format as Bulk Upload template</div>
-            </div>
-          </div>
-          <div class="drop-zone" id="report-filter-zone"
-               ondragover="event.preventDefault();this.classList.add('drag-over')"
-               ondragleave="this.classList.remove('drag-over')"
-               ondrop="handleReportFilterDrop(event)"
-               onclick="document.getElementById('report-filter-input').click()">
-            <span id="report-filter-icon" style="font-size:32px">📋</span>
-            <div id="report-filter-title" style="font-weight:700;margin-top:8px">Drop ASIN & Search Terms File</div>
-            <div id="report-filter-sub" style="font-size:12px;color:var(--text-muted);margin-top:4px">CSV or XLSX · Click to browse</div>
-            <input type="file" id="report-filter-input" accept=".csv,.xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12" style="display:none" onchange="handleReportFilterFile(event)">
-          </div>
-          <div id="report-filter-status" class="status-msg hidden" style="margin-top:8px"></div>
-          <button class="btn btn-secondary" style="margin-top:8px;font-size:12px" onclick="downloadTemplate('csv')">⬇ Download Template</button>
-        </div>
-
-        <!-- Right: Merged Amazon Ad Report -->
-        <div class="upload-col">
-          <div class="upload-col-header">
-            <span class="upload-col-num">2</span>
-            <div>
-              <div class="upload-col-title">Amazon Ads Workbooks</div>
-              <div class="upload-col-sub">Select one or many XLSX/XLSM reports · Search Term, Targeting, Placement, Advertised Product</div>
-            </div>
-          </div>
-          <div class="drop-zone" id="report-ads-zone"
-               ondragover="event.preventDefault();this.classList.add('drag-over')"
-               ondragleave="this.classList.remove('drag-over')"
-               ondrop="handleReportAdsDrop(event)"
-               onclick="document.getElementById('report-ads-input').click()">
-            <span id="report-ads-icon" style="font-size:32px">📊</span>
-            <div id="report-ads-title" style="font-weight:700;margin-top:8px">Drop Amazon Ads Report XLSX files</div>
-            <div id="report-ads-sub" style="font-size:12px;color:var(--text-muted);margin-top:4px">Multiple files allowed · original Amazon Excel reports</div>
-            <input type="file" id="report-ads-input" multiple accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12" style="display:none" onchange="handleReportAdsFile(event)">
-          </div>
-          <div id="report-ads-status" class="status-msg hidden" style="margin-top:8px"></div>
-        </div>
-      </div>
-
-      <!-- Target ACoS + Run button -->
-      <div style="display:flex;align-items:flex-end;gap:20px;margin-top:20px;flex-wrap:wrap">
-        <div>
-          <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:5px">Target ACoS (%)</label>
-          <input type="number" id="report-target-acos" value="20" min="1" max="500" step="1"
-                 style="width:100px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px">
-        </div>
-        <button class="btn btn-primary" id="report-run-btn" onclick="runReportAnalysis()" disabled
-                style="height:40px">
-          📊 Analyze Campaign Opportunities
-        </button>
-        <button class="btn btn-secondary" onclick="clearReport()" style="height:40px">✕ Clear</button>
-      </div>
-
-      <div id="report-error" class="error-msg hidden" style="margin-top:12px"></div>
-    </div>
-
-    <!-- Progress -->
-    <div id="report-progress-container" class="hidden" style="margin-top:16px">
-      <div class="card" style="padding:20px">
-        <div id="report-progress-text" style="font-size:13px;color:var(--text-muted);margin-bottom:10px">Checking rankings…</div>
-        <div style="background:var(--surface2);border-radius:99px;height:6px;overflow:hidden">
-          <div id="report-progress-fill" style="height:100%;background:var(--accent);border-radius:99px;width:0%;transition:width 0.4s ease"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Results: decision table -->
-    <div class="card hidden" id="report-results-card" style="margin-top:16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">
-        <h2 style="font-size:18px;font-weight:800">Campaign Opportunity Table</h2>
-        <div style="display:flex;gap:10px">
-          <button class="btn btn-secondary" onclick="exportReportCSV()">⬇ Export CSV</button>
-        </div>
-      </div>
-      <div id="report-export-status" class="status-msg status-info hidden" style="margin-bottom:12px"></div>
-      <div id="report-summary-body" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-bottom:14px"></div>
-      <div class="report-stats-bar" id="report-stats-bar"></div>
-      <div style="overflow-x:auto;margin-top:8px">
-        <table class="report-table">
-          <thead>
-            <tr>
-              <th>ASIN</th>
-              <th>Keyword</th>
-              <th>Organic Rank</th>
-              <th>Amazon Page</th>
-              <th>Campaign Name</th>
-              <th>Ad Group</th>
-              <th>Match Type</th>
-              <th>Source</th>
-              <th>CTR</th>
-              <th>CVR</th>
-              <th>ACoS</th>
-              <th>Top of Search</th>
-              <th>Target ACoS</th>
-              <th>Bid Change</th>
-              <th>Action</th>
-              <th>Reason</th>
-            </tr>
-          </thead>
-          <tbody id="report-table-body"></tbody>
-        </table>
-      </div>
-    </div>
-
-  </div><!-- end mode-report -->
 
   <!-- (PPC Analysis and PPC vs Organic moved inside Bulk Upload) -->
   <div id="mode-ppc" class="hidden">
@@ -2606,7 +2479,7 @@
   let pvoAsin = '';
 
   function switchMode(mode) {
-    ['single','bulk','report'].forEach(m => {
+    ['single','bulk'].forEach(m => {
       document.getElementById(`mode-${m}`).classList.toggle('hidden', m !== mode);
       document.getElementById(`tab-${m}`).classList.toggle('active', m === mode);
     });
