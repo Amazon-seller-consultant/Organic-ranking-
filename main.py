@@ -730,11 +730,40 @@ def parse_upload(content: bytes, filename: str) -> list[dict]:
     if not raw_rows:
         return rows
 
+    merged: dict[tuple[str, str], list[str]] = {}
+    seen_terms: dict[tuple[str, str], set[str]] = {}
+
+    headers = [_norm_key(value) for value in raw_rows[0]]
+    compact_headers = ["".join(ch for ch in value if ch.isalnum()) for value in headers]
+    if "asin" in compact_headers and "searchterm" in compact_headers:
+        asin_idx = compact_headers.index("asin")
+        term_idx = compact_headers.index("searchterm")
+        marketplace_idx = compact_headers.index("marketplace") if "marketplace" in compact_headers else None
+        for row in raw_rows[1:]:
+            if len(row) <= max(asin_idx, term_idx):
+                continue
+            asin = row[asin_idx].strip().upper()
+            marketplace = (
+                row[marketplace_idx].strip()
+                if marketplace_idx is not None and len(row) > marketplace_idx and row[marketplace_idx].strip()
+                else "amazon.com"
+            )
+            terms = [row[term_idx].strip()]
+            if asin and terms[0]:
+                key = (asin, marketplace)
+                merged.setdefault(key, [])
+                seen_terms.setdefault(key, set())
+                term_key = " ".join(terms[0].lower().split())
+                if term_key not in seen_terms[key]:
+                    seen_terms[key].add(term_key)
+                    merged[key].append(terms[0])
+        for (asin, marketplace), terms in merged.items():
+            rows.append({"asin": asin, "marketplace": marketplace, "terms": terms})
+        return rows
+
     # Skip header row
     data_rows = raw_rows[1:]
 
-    merged: dict[tuple[str, str], list[str]] = {}
-    seen_terms: dict[tuple[str, str], set[str]] = {}
     for row in data_rows:
         if not row:
             continue
@@ -2518,7 +2547,11 @@ async def seo_gap_analysis(
     }
     marketplace_by_asin = {entry["asin"]: entry["marketplace"] for entry in entries}
 
-    allowed_keys = {(entry["asin"], _keyword_key(entry["term"])) for entry in entries}
+    allowed_keys = {
+        (entry["asin"], _keyword_key(term))
+        for entry in entries
+        for term in entry["terms"]
+    }
     ads_lookup: dict[tuple[str, str], list[dict]] = {}
     for row in ads_rows:
         key = (row["asin"], row["keyword_key"])
