@@ -2447,6 +2447,8 @@ def _write_report_files(prefix: str, headers: list[str], rows: list[list]) -> di
         "xlsx_url": f"/static/exports/{xlsx_name}",
         "csv_download_url": f"/api/download/{csv_name}",
         "xlsx_download_url": f"/api/download/{xlsx_name}",
+        "csv_path": str(export_dir / csv_name),
+        "xlsx_path": str(export_dir / xlsx_name),
         "csv_name": csv_name,
         "xlsx_name": xlsx_name,
     }

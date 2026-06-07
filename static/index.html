@@ -955,6 +955,7 @@
           <a class="btn btn-secondary" id="audit-csv-link" download>Download CSV</a>
           <a class="btn btn-primary" id="audit-xlsx-link" download>Download Excel</a>
         </div>
+        <div id="audit-file-paths" class="status-msg status-info hidden" style="margin-top:12px;font-size:12px;line-height:1.7;"></div>
       </div>
       <div class="card">
         <div class="card-title">🔴 Action Required</div>
@@ -2734,7 +2735,7 @@
     document.getElementById('audit-rank-title').textContent = 'Select ASIN Rank Template';
     document.getElementById('audit-rank-sub').textContent = 'CSV/XLSX · controls which ASINs are analyzed';
     updateAuditReady();
-    hideEl('audit-results'); hideEl('audit-error');
+    hideEl('audit-results'); hideEl('audit-error'); hideEl('audit-file-paths');
   }
 
   const auditMoney = value => `$${Number(value || 0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}`;
@@ -2776,7 +2777,7 @@
     if (!auditFiles.length || !auditRankFile) return;
     const button = document.getElementById('audit-run-btn');
     button.disabled = true; button.innerHTML = '<span class="spinner"></span> Analyzing...';
-    showEl('audit-progress'); hideEl('audit-error'); hideEl('audit-results');
+    showEl('audit-progress'); hideEl('audit-error'); hideEl('audit-results'); hideEl('audit-file-paths');
     document.getElementById('audit-progress-fill').style.width = '65%';
     try {
       const form = new FormData();
@@ -2820,6 +2821,12 @@
         document.getElementById('audit-xlsx-link').href = seoDownloadUrl(
           data.ads_audit_report.xlsx_download_url || data.ads_audit_report.xlsx_url
         );
+        const localPaths = [data.ads_audit_report.xlsx_path, data.ads_audit_report.csv_path].filter(Boolean);
+        if (localPaths.length) {
+          document.getElementById('audit-file-paths').innerHTML =
+            `Saved locally. If your browser blocks downloads, open these files directly:<br>${localPaths.map(path => `<code>${escHtml(path)}</code>`).join('<br>')}`;
+          showEl('audit-file-paths');
+        }
       }
       document.getElementById('audit-progress-fill').style.width = '100%';
       showEl('audit-results');
