@@ -2628,7 +2628,7 @@ async def seo_gap_analysis(
             ])
 
     rank_files = _write_report_files("rank_report", rank_headers, rank_rows)
-    gap_files = _write_report_files("seo_gap_report", gap_headers, gap_rows)
+    gap_files = _write_report_files("seo_gap_report_filtered", gap_headers, gap_rows)
 
     return {
         "rank_report": rank_files,
