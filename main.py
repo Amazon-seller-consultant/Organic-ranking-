@@ -1596,6 +1596,44 @@ def _audit_keyword_pairs(
     return sorted(pairs.values(), key=lambda x: (x["spend"], x["clicks"]), reverse=True)
 
 
+_RELEVANCE_GENERIC_TERMS = {
+    "a", "an", "and", "as", "for", "from", "in", "of", "on", "or", "the", "to", "with",
+    "light", "lights", "led", "lamp", "lamps", "glow", "decoration", "decorations",
+    "decor", "accessory", "accessories", "outdoor", "indoor", "kids", "kid", "children",
+    "child", "toy", "toys", "battery", "operated", "rechargeable", "waterproof",
+    "color", "colors", "green", "blue", "red", "white", "bright", "brightz",
+}
+
+
+def _relevance_tokens(value: str) -> set[str]:
+    cleaned = "".join(ch.lower() if ch.isalnum() else " " for ch in value)
+    return {
+        token for token in cleaned.split()
+        if len(token) > 2 and token not in _RELEVANCE_GENERIC_TERMS
+    }
+
+
+def _heuristic_relevance_decision(asin: str, keyword: str, terms_by_asin: dict[str, list[str]]) -> Optional[dict]:
+    product_tokens = set()
+    for term in terms_by_asin.get(asin, []):
+        product_tokens.update(_relevance_tokens(term))
+    target_tokens = _relevance_tokens(keyword)
+    if not product_tokens or not target_tokens:
+        return None
+    overlap = product_tokens & target_tokens
+    if overlap:
+        return None
+    return {
+        "label": "Irrelevant",
+        "confidence": 85,
+        "include": False,
+        "reason": (
+            "No product-line overlap with this ASIN's Rank Template terms. "
+            f"Target tokens: {', '.join(sorted(target_tokens)[:5])}."
+        ),
+    }
+
+
 async def _classify_audit_relevance(
     candidates: list[dict],
     terms_by_asin: dict[str, list[str]],
@@ -1692,6 +1730,7 @@ def _build_ads_audit(
     new_asins: set[str],
     allowed_asins: set[str],
     relevance_decisions: dict[tuple[str, str], dict],
+    terms_by_asin: dict[str, list[str]],
 ) -> dict:
     asin_by_slot: dict[tuple[str, str], set[str]] = {}
     for row in sheets["advertised"] + sheets["purchased"]:
@@ -1735,6 +1774,8 @@ def _build_ads_audit(
             relevant_asins = []
             for asin in mapped_asins:
                 decision = relevance_decisions.get((asin, keyword_key))
+                if not decision:
+                    decision = _heuristic_relevance_decision(asin, keyword, terms_by_asin)
                 if decision and not decision.get("include"):
                     irrelevant_targets.append({
                         "asin": asin,
@@ -2042,7 +2083,7 @@ async def ads_performance_audit(
         )
     result = _build_ads_audit(
         combined, reporting_period, campaign_type, margin, business_goal,
-        asin_set & allowed_asins, allowed_asins, relevance_decisions,
+        asin_set & allowed_asins, allowed_asins, relevance_decisions, terms_by_asin,
     )
     result["summary"]["relevance_checked"] = len(relevance_decisions)
     result["summary"]["relevance_candidate_count"] = len(relevance_candidates)
