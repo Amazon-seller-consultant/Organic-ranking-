@@ -930,6 +930,10 @@
           <input id="audit-new-asins" type="text" placeholder="Comma-separated, or leave blank" />
         </div>
       </div>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:14px;color:var(--text);font-size:13px;">
+        <input id="audit-ai-relevance" type="checkbox" checked style="width:auto;" />
+        Use AI relevance filter to remove unrelated product-line targets
+      </label>
 
       <div style="display:flex;gap:10px;margin-top:18px;">
         <button class="btn btn-primary btn-lg" id="audit-run-btn" onclick="runAdsAudit()" disabled>Run Ads Audit</button>
@@ -951,6 +955,10 @@
       <div class="card">
         <div class="card-title">🔴 Action Required</div>
         <div id="audit-action"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">🚫 Irrelevant / Negative Candidates</div>
+        <div id="audit-irrelevant"></div>
       </div>
       <div class="card">
         <div class="card-title">🟡 Watch List</div>
@@ -2741,6 +2749,7 @@
           <strong>Metrics:</strong> ${auditMoney(item.spend)} spend · ${auditMoney(item.sales)} revenue ·
           ${kind === 'insufficient' ? 'ACoS suppressed · CVR suppressed' : `${auditPct(item.acos)} ACoS · ${auditPct(item.cvr)} CVR`} ·
           ${Number(item.clicks).toFixed(0)} clicks · ${auditPct(item.ctr)} CTR<br>
+          ${item.relevance ? `<strong>Relevance:</strong> ${escHtml(item.relevance)}${item.confidence ? ` · ${item.confidence}% confidence` : ''}<br>` : ''}
           <strong>${kind === 'watch' ? 'Signal' : kind === 'insufficient' ? 'Status' : 'Issue'}:</strong> ${escHtml(item.reason)}<br>
           <strong>${kind === 'watch' ? 'Next Step' : kind === 'insufficient' ? 'Data Needed' : 'Recommended Action'}:</strong> ${escHtml(item.next_step)}
         </div>
@@ -2774,6 +2783,7 @@
       form.append('margin', document.getElementById('audit-margin').value || '30');
       form.append('business_goal', document.getElementById('audit-goal').value);
       form.append('new_asins', document.getElementById('audit-new-asins').value.trim());
+      form.append('ai_relevance', document.getElementById('audit-ai-relevance').checked ? 'true' : 'false');
       const response = await fetchWithTimeout(`${API_BASE}/api/ads-performance-audit`, {method:'POST', body:form}, 240000);
       const data = await readApiResponse(response, 'Ads audit failed.');
       const s = data.summary, c = data.context, counts = s.section_counts || {};
@@ -2784,7 +2794,8 @@
         The audit found ${counts.performing || 0} trustworthy performers, ${counts.action_required || 0} immediate issues,
         ${counts.watch_list || 0} directional signals, and ${counts.insufficient || 0} items needing more data.
         Break-even ACoS is ${auditPct(c.break_even_acos)} using the supplied ${c.margin}% margin.
-        Analysis is restricted to the ${c.template_asins.length} ASIN${c.template_asins.length === 1 ? '' : 's'} in the uploaded ASIN Rank Template.`;
+        Analysis is restricted to the ${c.template_asins.length} ASIN${c.template_asins.length === 1 ? '' : 's'} in the uploaded ASIN Rank Template.
+        ${s.relevance_checked ? `AI checked ${s.relevance_checked.toLocaleString()} high-spend shared ASIN-target pairs out of ${s.relevance_candidate_count.toLocaleString()} candidates and excluded ${(data.irrelevant_targets || []).length} unrelated candidates from the audit.` : 'AI relevance filtering was not used.'}`;
       const dayMatch = document.getElementById('audit-period').value.toLowerCase().match(/(\d+)\s*day/);
       const warning = document.getElementById('audit-warning');
       if (dayMatch && Number(dayMatch[1]) < 14) {
@@ -2792,6 +2803,7 @@
         showEl('audit-warning');
       } else hideEl('audit-warning');
       document.getElementById('audit-action').innerHTML = renderAuditCards(data.action_required, 'action');
+      document.getElementById('audit-irrelevant').innerHTML = renderAuditCards(data.irrelevant_targets || [], 'irrelevant');
       document.getElementById('audit-watch').innerHTML = renderAuditCards(data.watch_list, 'watch');
       document.getElementById('audit-performing').innerHTML = renderAuditPerformers(data.performing);
       document.getElementById('audit-insufficient').innerHTML = renderAuditCards(data.insufficient, 'insufficient');

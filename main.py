@@ -5,6 +5,7 @@ import asyncio
 import time
 import logging
 import math
+import json
 from datetime import datetime, timezone
 from uuid import uuid4
 import httpx
@@ -40,6 +41,7 @@ PAGE_SIZE = 16  # Amazon typically shows 16-24 results per page
 SERPAPI_CONCURRENCY = max(1, int(os.getenv("SERPAPI_CONCURRENCY", "6")))
 RANK_CACHE_TTL_SECONDS = max(0, int(os.getenv("RANK_CACHE_TTL_SECONDS", "21600")))
 AI_CONCURRENCY = max(1, int(os.getenv("AI_CONCURRENCY", "2")))
+AI_RELEVANCE_MAX = max(1, int(os.getenv("AI_RELEVANCE_MAX", "120")))
 CANOPY_CONCURRENCY = max(1, int(os.getenv("CANOPY_CONCURRENCY", "5")))
 CANOPY_MAX_PAGES = 5
 CANOPY_SEARCH_URL = "https://rest.canopyapi.co/api/amazon/search"
@@ -755,6 +757,58 @@ def parse_upload(content: bytes, filename: str) -> list[dict]:
         rows.append({"asin": asin, "marketplace": marketplace, "terms": terms})
 
     return rows
+
+
+def parse_asin_rank_context(content: bytes, filename: str) -> dict[str, list[str]]:
+    """Return ASIN -> template terms from either the wide template or a generated rank report."""
+    if filename.lower().endswith((".xlsx", ".xlsm")):
+        from openpyxl import load_workbook
+        wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+        try:
+            ws = wb.worksheets[0]
+            raw_rows = [[str(cell.value).strip() if cell.value is not None else "" for cell in row]
+                        for row in ws.iter_rows()]
+        finally:
+            wb.close()
+    else:
+        text = content.decode("utf-8-sig", errors="replace")
+        raw_rows = [row for row in csv.reader(text.splitlines())]
+
+    if not raw_rows:
+        return {}
+
+    headers = [_norm_key(value) for value in raw_rows[0]]
+    compact_headers = ["".join(ch for ch in value if ch.isalnum()) for value in headers]
+    context: dict[str, list[str]] = {}
+    seen: dict[str, set[str]] = {}
+
+    def add_term(asin: str, term: str):
+        asin = asin.strip().upper()
+        term = " ".join(term.strip().split())
+        if not asin or not term:
+            return
+        term_key = term.lower()
+        context.setdefault(asin, [])
+        seen.setdefault(asin, set())
+        if term_key not in seen[asin]:
+            seen[asin].add(term_key)
+            context[asin].append(term)
+
+    if "asin" in compact_headers and "searchterm" in compact_headers:
+        asin_idx = compact_headers.index("asin")
+        term_idx = compact_headers.index("searchterm")
+        for row in raw_rows[1:]:
+            if len(row) > max(asin_idx, term_idx):
+                add_term(row[asin_idx], row[term_idx])
+        return context
+
+    for row in raw_rows[1:]:
+        if not row:
+            continue
+        asin = row[0].strip().upper() if len(row) > 0 else ""
+        for term in row[2:]:
+            add_term(asin, term)
+    return context
 
 
 @app.post("/api/bulk-check")
@@ -1505,6 +1559,130 @@ def _audit_metric_labels(
     }
 
 
+def _audit_keyword_pairs(
+    sheets: dict[str, list[dict]],
+    allowed_asins: set[str],
+) -> list[dict]:
+    asin_by_slot: dict[tuple[str, str], set[str]] = {}
+    for row in sheets["advertised"] + sheets["purchased"]:
+        asin = _norm_text(_row_get(row, "Advertised ASIN")).upper()
+        campaign = _norm_key(_row_get(row, "Campaign Name"))
+        ad_group = _norm_key(_row_get(row, "Ad Group Name"))
+        if asin and campaign and asin in allowed_asins:
+            asin_by_slot.setdefault((campaign, ad_group), set()).add(asin)
+
+    pairs = {}
+    for rows in (sheets["search_terms"], sheets["targeting"]):
+        for row in rows:
+            campaign = _norm_key(_row_get(row, "Campaign Name"))
+            ad_group = _norm_key(_row_get(row, "Ad Group Name"))
+            keyword = _norm_text(_row_get(
+                row, "Customer Search Term", "Search Term", "Targeting", "Target", "Keyword"
+            ))
+            if not campaign or not keyword:
+                continue
+            mapped_asins = asin_by_slot.get((campaign, ad_group)) or set()
+            if len(mapped_asins) <= 1:
+                continue
+            for asin in mapped_asins:
+                item = pairs.setdefault((asin, _keyword_key(keyword)), {
+                    "asin": asin,
+                    "keyword": keyword,
+                    "spend": 0.0,
+                    "clicks": 0.0,
+                })
+                item["spend"] += _num(_row_get(row, "Spend"))
+                item["clicks"] += _num(_row_get(row, "Clicks"))
+    return sorted(pairs.values(), key=lambda x: (x["spend"], x["clicks"]), reverse=True)
+
+
+async def _classify_audit_relevance(
+    candidates: list[dict],
+    terms_by_asin: dict[str, list[str]],
+) -> dict[tuple[str, str], dict]:
+    if not ANTHROPIC_API_KEY or not candidates:
+        return {}
+
+    unique = []
+    seen = set()
+    for candidate in candidates:
+        asin = candidate["asin"]
+        keyword = candidate["keyword"]
+        key = (asin, _keyword_key(keyword))
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append({
+            "id": len(unique),
+            "asin": asin,
+            "target": keyword,
+            "product_terms": terms_by_asin.get(asin, [])[:30],
+        })
+
+    prompt_base = """You are an Amazon product relevance classifier.
+
+Compare each target/search term to the ASIN's own product context terms.
+
+Labels:
+- Direct: same product intent
+- Adjacent: closely related expansion intent
+- Competitor: same shopper need but competitor/product alternative
+- Accessory: accessory or add-on intent
+- Irrelevant: unrelated product line or different shopper intent
+
+Rules:
+- Do not mark a target relevant just because it contains generic words like light, LED, outdoor, kids, decoration, bike, or trampoline.
+- Only Direct/Adjacent/Competitor/Accessory should be included in the ads audit.
+- Mark Irrelevant when the target belongs to a different product line, such as trampoline lights vs bike wheel lights.
+- Return only valid JSON with this shape:
+[
+  {"id": 0, "label": "Direct", "confidence": 95, "include": true, "reason": "short reason"}
+]
+"""
+    batches = [unique[i:i + 40] for i in range(0, len(unique), 40)]
+    decisions: dict[tuple[str, str], dict] = {}
+
+    def classify_batch(batch: list[dict]) -> list[dict]:
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        msg = _anthropic_create_message(
+            client,
+            model="claude-sonnet-4-6",
+            max_tokens=7000,
+            system=prompt_base,
+            messages=[{
+                "role": "user",
+                "content": json.dumps(batch, ensure_ascii=False),
+            }],
+        )
+        raw = msg.content[0].text.strip()
+        parsed = _parse_raw_json(raw)
+        if not isinstance(parsed, list):
+            raise HTTPException(status_code=500, detail="AI relevance response was not a JSON list.")
+        return parsed
+
+    semaphore = asyncio.Semaphore(AI_CONCURRENCY)
+
+    async def run_limited(batch: list[dict]) -> list[dict]:
+        async with semaphore:
+            return await asyncio.to_thread(classify_batch, batch)
+
+    for batch, result in zip(batches, await asyncio.gather(*[run_limited(batch) for batch in batches])):
+        by_id = {item["id"]: item for item in batch}
+        for row in result:
+            source = by_id.get(row.get("id"))
+            if not source:
+                continue
+            label = _norm_text(row.get("label")) or "Unknown"
+            include = bool(row.get("include")) and label.lower() != "irrelevant"
+            decisions[(source["asin"], _keyword_key(source["target"]))] = {
+                "label": label,
+                "confidence": int(_num(row.get("confidence")) or 0),
+                "include": include,
+                "reason": _norm_text(row.get("reason")),
+            }
+    return decisions
+
+
 def _build_ads_audit(
     sheets: dict[str, list[dict]],
     reporting_period: str,
@@ -1513,6 +1691,7 @@ def _build_ads_audit(
     business_goal: str,
     new_asins: set[str],
     allowed_asins: set[str],
+    relevance_decisions: dict[tuple[str, str], dict],
 ) -> dict:
     asin_by_slot: dict[tuple[str, str], set[str]] = {}
     for row in sheets["advertised"] + sheets["purchased"]:
@@ -1527,6 +1706,7 @@ def _build_ads_audit(
         ("Search Term", sheets["search_terms"]),
         ("Targeting", sheets["targeting"]),
     ]
+    irrelevant_targets = []
     for source, rows in sources:
         for row in rows:
             campaign = _norm_text(_row_get(row, "Campaign Name")) or "Unknown Campaign"
@@ -1544,10 +1724,45 @@ def _build_ads_audit(
             mapped_asins = asin_by_slot.get(slot) or set()
             if not mapped_asins:
                 continue
+
+            keyword_key = _keyword_key(keyword)
+            impressions = _num(_row_get(row, "Impressions"))
+            clicks = _num(_row_get(row, "Clicks"))
+            spend = _num(_row_get(row, "Spend"))
+            sales = _num(_row_get(row, "7 Day Total Sales", "14 Day Total Sales", "Sales"))
+            orders = _num(_row_get(row, "7 Day Total Orders", "14 Day Total Orders", "Orders"))
+
+            relevant_asins = []
+            for asin in mapped_asins:
+                decision = relevance_decisions.get((asin, keyword_key))
+                if decision and not decision.get("include"):
+                    irrelevant_targets.append({
+                        "asin": asin,
+                        "keyword": keyword,
+                        "campaign": campaign,
+                        "ad_group": ad_group,
+                        "match_type": match_type,
+                        "campaign_type": row_campaign_type,
+                        "source": source,
+                        "spend": spend,
+                        "sales": sales,
+                        "clicks": clicks,
+                        "orders": orders,
+                        "relevance": decision.get("label", "Irrelevant"),
+                        "confidence": decision.get("confidence", 0),
+                        "reason": decision.get("reason", "AI relevance filter excluded this target."),
+                        "next_step": "Exclude from this ASIN audit; review as negative or move to the correct product line.",
+                    })
+                    continue
+                relevant_asins.append(asin)
+
+            if not relevant_asins:
+                continue
+
             asin_labels = (
-                list(mapped_asins)
-                if len(mapped_asins) == 1
-                else [", ".join(sorted(mapped_asins))]
+                relevant_asins
+                if len(relevant_asins) == 1
+                else [", ".join(sorted(relevant_asins))]
             )
             for asin in asin_labels:
                 key = (asin, campaign, ad_group, keyword, match_type, row_campaign_type)
@@ -1564,14 +1779,22 @@ def _build_ads_audit(
                     "spend": 0.0,
                     "sales": 0.0,
                     "orders": 0.0,
+                    "relevance": "Relevant",
                 })
-                item["impressions"] += _num(_row_get(row, "Impressions"))
-                item["clicks"] += _num(_row_get(row, "Clicks"))
-                item["spend"] += _num(_row_get(row, "Spend"))
-                item["sales"] += _num(_row_get(row, "7 Day Total Sales", "14 Day Total Sales", "Sales"))
-                item["orders"] += _num(_row_get(
-                    row, "7 Day Total Orders", "14 Day Total Orders", "Orders"
-                ))
+                decisions = [
+                    relevance_decisions.get((single_asin, keyword_key))
+                    for single_asin in relevant_asins
+                    if relevance_decisions.get((single_asin, keyword_key))
+                ]
+                if decisions:
+                    item["relevance"] = ", ".join(sorted({
+                        decision.get("label", "Relevant") for decision in decisions
+                    }))
+                item["impressions"] += impressions
+                item["clicks"] += clicks
+                item["spend"] += spend
+                item["sales"] += sales
+                item["orders"] += orders
 
     if not grouped:
         raise HTTPException(
@@ -1718,10 +1941,16 @@ def _build_ads_audit(
         "watch_list": watch_list[:100],
         "performing": performing[:100],
         "insufficient": insufficient[:100],
+        "irrelevant_targets": sorted(
+            irrelevant_targets,
+            key=lambda x: (x["spend"], x["clicks"]),
+            reverse=True,
+        )[:100],
         "recommendations": recommendations,
         "caveats": [
             "All attributed metrics use the reporting columns supplied by Amazon.",
             "Only ASINs from the uploaded ASIN Rank Template are included.",
+            "AI relevance filtering compares each target to that ASIN's uploaded Rank Template terms and excludes unrelated product lines from the audit.",
             "When one Campaign + Ad Group maps to multiple template ASINs, they are listed together and the shared metrics are counted once.",
             "Mixed campaign types should be uploaded and reviewed separately when their report schemas differ.",
             "Break-even ACoS follows the requested formula: 1 minus margin percentage.",
@@ -1738,6 +1967,7 @@ async def ads_performance_audit(
     margin: float = Form(30.0),
     business_goal: str = Form("Profitable growth"),
     new_asins: str = Form(""),
+    ai_relevance: bool = Form(True),
 ):
     if not ads_files:
         raise HTTPException(status_code=400, detail="Upload at least one Amazon Ads workbook.")
@@ -1750,8 +1980,9 @@ async def ads_performance_audit(
             status_code=400,
             detail="ASIN Rank Template must be CSV, XLSX, or XLSM.",
         )
-    rank_entries = parse_upload(await rank_file.read(), rank_name)
-    allowed_asins = {entry["asin"] for entry in rank_entries}
+    rank_content = await rank_file.read()
+    terms_by_asin = parse_asin_rank_context(rank_content, rank_name)
+    allowed_asins = set(terms_by_asin)
     if not allowed_asins:
         raise HTTPException(
             status_code=400,
@@ -1799,10 +2030,23 @@ async def ads_performance_audit(
         for value in new_asins.replace("\n", ",").split(",")
         if value.strip()
     }
+    relevance_decisions = {}
+    relevance_candidates = []
+    if ai_relevance:
+        if not ANTHROPIC_API_KEY:
+            raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not configured for AI relevance filtering.")
+        relevance_candidates = _audit_keyword_pairs(combined, allowed_asins)
+        relevance_decisions = await _classify_audit_relevance(
+            relevance_candidates[:AI_RELEVANCE_MAX],
+            terms_by_asin,
+        )
     result = _build_ads_audit(
         combined, reporting_period, campaign_type, margin, business_goal,
-        asin_set & allowed_asins, allowed_asins,
+        asin_set & allowed_asins, allowed_asins, relevance_decisions,
     )
+    result["summary"]["relevance_checked"] = len(relevance_decisions)
+    result["summary"]["relevance_candidate_count"] = len(relevance_candidates)
+    result["summary"]["relevance_check_limit"] = AI_RELEVANCE_MAX if ai_relevance else 0
     result["parse_warnings"] = errors
     return result
 
