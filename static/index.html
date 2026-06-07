@@ -879,14 +879,22 @@
     <div class="card">
       <div class="card-title">Amazon Ads Performance Audit</div>
       <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">
-        Upload one full multi-tab workbook or several original Amazon Ads Excel reports. Decisions are gated by clicks, spend, and orders before performance metrics are evaluated.
+        Upload the ASIN Rank Template plus one full multi-tab workbook or several original Amazon Ads Excel reports. Only ASINs listed in the template are analyzed.
       </p>
 
-      <div class="drop-zone" id="audit-file-zone" onclick="document.getElementById('audit-file-input').click()">
-        <input type="file" id="audit-file-input" accept=".xlsx,.xlsm" multiple onchange="setAuditFiles(event)" />
-        <div class="drop-zone-icon">📊</div>
-        <h3 id="audit-file-title">Select Amazon Ads Excel report(s)</h3>
-        <p id="audit-file-sub">XLSX/XLSM · multiple files and multi-tab workbooks supported</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <div class="drop-zone" id="audit-rank-zone" onclick="document.getElementById('audit-rank-input').click()">
+          <input type="file" id="audit-rank-input" accept=".csv,.xlsx,.xlsm" onchange="setAuditRankFile(event)" />
+          <div class="drop-zone-icon">📋</div>
+          <h3 id="audit-rank-title">Select ASIN Rank Template</h3>
+          <p id="audit-rank-sub">CSV/XLSX · controls which ASINs are analyzed</p>
+        </div>
+        <div class="drop-zone" id="audit-file-zone" onclick="document.getElementById('audit-file-input').click()">
+          <input type="file" id="audit-file-input" accept=".xlsx,.xlsm" multiple onchange="setAuditFiles(event)" />
+          <div class="drop-zone-icon">📊</div>
+          <h3 id="audit-file-title">Select Amazon Ads Excel report(s)</h3>
+          <p id="audit-file-sub">XLSX/XLSM · multiple files and multi-tab workbooks supported</p>
+        </div>
       </div>
 
       <div class="seo-upload-grid" style="margin-top:18px;">
@@ -2662,6 +2670,7 @@
   let pvoResults = [];
   let pvoAsin = '';
   let auditFiles = [];
+  let auditRankFile = null;
 
   function switchMode(mode) {
     ['single','bulk','audit'].forEach(m => {
@@ -2681,15 +2690,38 @@
       auditFiles.length === 1 ? auditFiles[0].name : `${auditFiles.length} reports selected`;
     document.getElementById('audit-file-sub').textContent =
       `${(auditFiles.reduce((sum, file) => sum + file.size, 0) / 1048576).toFixed(2)} MB total`;
-    document.getElementById('audit-run-btn').disabled = !auditFiles.length;
+    updateAuditReady();
+  }
+
+  function setAuditRankFile(event) {
+    const file = event.target.files[0];
+    if (!file || !/\.(csv|xlsx|xlsm)$/i.test(file.name)) {
+      auditRankFile = null;
+      alert('Select the ASIN Rank Template as CSV, XLSX, or XLSM.');
+      updateAuditReady();
+      return;
+    }
+    auditRankFile = file;
+    document.getElementById('audit-rank-title').textContent = file.name;
+    document.getElementById('audit-rank-sub').textContent =
+      `${(file.size / 1024).toFixed(1)} KB · ASIN filter ready`;
+    updateAuditReady();
+  }
+
+  function updateAuditReady() {
+    document.getElementById('audit-run-btn').disabled = !(auditRankFile && auditFiles.length);
   }
 
   function clearAdsAudit() {
     auditFiles = [];
+    auditRankFile = null;
     document.getElementById('audit-file-input').value = '';
+    document.getElementById('audit-rank-input').value = '';
     document.getElementById('audit-file-title').textContent = 'Select Amazon Ads Excel report(s)';
     document.getElementById('audit-file-sub').textContent = 'XLSX/XLSM · multiple files and multi-tab workbooks supported';
-    document.getElementById('audit-run-btn').disabled = true;
+    document.getElementById('audit-rank-title').textContent = 'Select ASIN Rank Template';
+    document.getElementById('audit-rank-sub').textContent = 'CSV/XLSX · controls which ASINs are analyzed';
+    updateAuditReady();
     hideEl('audit-results'); hideEl('audit-error');
   }
 
@@ -2728,7 +2760,7 @@
   }
 
   async function runAdsAudit() {
-    if (!auditFiles.length) return;
+    if (!auditFiles.length || !auditRankFile) return;
     const button = document.getElementById('audit-run-btn');
     button.disabled = true; button.innerHTML = '<span class="spinner"></span> Analyzing...';
     showEl('audit-progress'); hideEl('audit-error'); hideEl('audit-results');
@@ -2736,6 +2768,7 @@
     try {
       const form = new FormData();
       auditFiles.forEach(file => form.append('ads_files', file));
+      form.append('rank_file', auditRankFile);
       form.append('reporting_period', document.getElementById('audit-period').value.trim());
       form.append('campaign_type', document.getElementById('audit-campaign-type').value);
       form.append('margin', document.getElementById('audit-margin').value || '30');
@@ -2750,7 +2783,8 @@
         Account CVR was ${auditPct(s.cvr)} and CTR was ${auditPct(s.ctr)} across ${s.rows.toLocaleString()} structures.
         The audit found ${counts.performing || 0} trustworthy performers, ${counts.action_required || 0} immediate issues,
         ${counts.watch_list || 0} directional signals, and ${counts.insufficient || 0} items needing more data.
-        Break-even ACoS is ${auditPct(c.break_even_acos)} using the supplied ${c.margin}% margin.`;
+        Break-even ACoS is ${auditPct(c.break_even_acos)} using the supplied ${c.margin}% margin.
+        Analysis is restricted to the ${c.template_asins.length} ASIN${c.template_asins.length === 1 ? '' : 's'} in the uploaded ASIN Rank Template.`;
       const dayMatch = document.getElementById('audit-period').value.toLowerCase().match(/(\d+)\s*day/);
       const warning = document.getElementById('audit-warning');
       if (dayMatch && Number(dayMatch[1]) < 14) {

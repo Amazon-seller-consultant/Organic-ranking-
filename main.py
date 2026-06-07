@@ -1512,13 +1512,14 @@ def _build_ads_audit(
     margin: float,
     business_goal: str,
     new_asins: set[str],
+    allowed_asins: set[str],
 ) -> dict:
     asin_by_slot: dict[tuple[str, str], set[str]] = {}
     for row in sheets["advertised"] + sheets["purchased"]:
         asin = _norm_text(_row_get(row, "Advertised ASIN")).upper()
         campaign = _norm_key(_row_get(row, "Campaign Name"))
         ad_group = _norm_key(_row_get(row, "Ad Group Name"))
-        if asin and campaign:
+        if asin and campaign and asin in allowed_asins:
             asin_by_slot.setdefault((campaign, ad_group), set()).add(asin)
 
     grouped: dict[tuple[str, str, str, str, str, str], dict] = {}
@@ -1541,10 +1542,12 @@ def _build_ads_audit(
             ) or campaign_type
             slot = (_norm_key(campaign), _norm_key(ad_group))
             mapped_asins = asin_by_slot.get(slot) or set()
+            if not mapped_asins:
+                continue
             asin_labels = (
                 list(mapped_asins)
                 if len(mapped_asins) == 1
-                else [f"Multiple ASINs ({len(mapped_asins)})" if mapped_asins else "Unmapped"]
+                else [", ".join(sorted(mapped_asins))]
             )
             for asin in asin_labels:
                 key = (asin, campaign, ad_group, keyword, match_type, row_campaign_type)
@@ -1573,7 +1576,10 @@ def _build_ads_audit(
     if not grouped:
         raise HTTPException(
             status_code=400,
-            detail="No Search Term or Targeting performance rows were found in the uploaded workbook(s).",
+            detail=(
+                "No advertising performance rows matched the ASINs in the ASIN Rank Template. "
+                "Confirm that the Advertised Products report is included and uses the same Campaign and Ad Group names."
+            ),
         )
 
     rows = list(grouped.values())
@@ -1698,6 +1704,7 @@ def _build_ads_audit(
             "break_even_acos": break_even_acos,
             "business_goal": business_goal or "Profitable growth",
             "new_asins": sorted(new_asins),
+            "template_asins": sorted(allowed_asins),
         },
         "summary": {
             **totals,
@@ -1714,7 +1721,8 @@ def _build_ads_audit(
         "recommendations": recommendations,
         "caveats": [
             "All attributed metrics use the reporting columns supplied by Amazon.",
-            "Unmapped ASIN means no Advertised Products report row matched Campaign + Ad Group.",
+            "Only ASINs from the uploaded ASIN Rank Template are included.",
+            "When one Campaign + Ad Group maps to multiple template ASINs, they are listed together and the shared metrics are counted once.",
             "Mixed campaign types should be uploaded and reviewed separately when their report schemas differ.",
             "Break-even ACoS follows the requested formula: 1 minus margin percentage.",
         ],
@@ -1724,6 +1732,7 @@ def _build_ads_audit(
 @app.post("/api/ads-performance-audit")
 async def ads_performance_audit(
     ads_files: list[UploadFile] = File(...),
+    rank_file: UploadFile = File(...),
     reporting_period: str = Form(""),
     campaign_type: str = Form("Sponsored Products"),
     margin: float = Form(30.0),
@@ -1734,6 +1743,20 @@ async def ads_performance_audit(
         raise HTTPException(status_code=400, detail="Upload at least one Amazon Ads workbook.")
     if margin <= 0 or margin >= 100:
         raise HTTPException(status_code=400, detail="Margin must be between 0 and 100.")
+
+    rank_name = rank_file.filename or ""
+    if not rank_name.lower().endswith((".csv", ".xlsx", ".xlsm")):
+        raise HTTPException(
+            status_code=400,
+            detail="ASIN Rank Template must be CSV, XLSX, or XLSM.",
+        )
+    rank_entries = parse_upload(await rank_file.read(), rank_name)
+    allowed_asins = {entry["asin"] for entry in rank_entries}
+    if not allowed_asins:
+        raise HTTPException(
+            status_code=400,
+            detail="No valid ASINs were found in the ASIN Rank Template.",
+        )
 
     combined = {
         "advertised": [],
@@ -1777,7 +1800,8 @@ async def ads_performance_audit(
         if value.strip()
     }
     result = _build_ads_audit(
-        combined, reporting_period, campaign_type, margin, business_goal, asin_set
+        combined, reporting_period, campaign_type, margin, business_goal,
+        asin_set & allowed_asins, allowed_asins,
     )
     result["parse_warnings"] = errors
     return result
