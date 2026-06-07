@@ -861,6 +861,7 @@
             <a class="btn btn-secondary" id="rank-csv-link" download>CSV</a>
             <a class="btn btn-primary" id="rank-xlsx-link" download>Excel</a>
           </div>
+          <div id="rank-file-paths" class="status-msg status-info hidden" style="margin-top:12px;font-size:12px;line-height:1.7;"></div>
         </div>
         <div style="border:1px solid var(--border);padding:16px;border-radius:var(--radius-sm);">
           <div style="font-weight:700;margin-bottom:5px;">SEO Gap Report</div>
@@ -869,6 +870,7 @@
             <a class="btn btn-secondary" id="gap-csv-link" download>CSV</a>
             <a class="btn btn-primary" id="gap-xlsx-link" download>Excel</a>
           </div>
+          <div id="gap-file-paths" class="status-msg status-info hidden" style="margin-top:12px;font-size:12px;line-height:1.7;"></div>
         </div>
       </div>
     </div>
@@ -1592,6 +1594,8 @@
     hideEl('seo-results-card');
     hideEl('seo-error');
     hideEl('seo-progress');
+    hideEl('rank-file-paths');
+    hideEl('gap-file-paths');
   }
 
   function seoDownloadUrl(path) {
@@ -1608,6 +1612,8 @@
     showEl('seo-progress');
     hideEl('seo-results-card');
     hideEl('seo-error');
+    hideEl('rank-file-paths');
+    hideEl('gap-file-paths');
 
     let progress = 4;
     const timer = setInterval(() => {
@@ -1653,12 +1659,24 @@
       document.getElementById('rank-xlsx-link').href = seoDownloadUrl(
         data.rank_report.xlsx_download_url || data.rank_report.xlsx_url
       );
+      const rankPaths = [data.rank_report.xlsx_path, data.rank_report.csv_path].filter(Boolean);
+      if (rankPaths.length) {
+        document.getElementById('rank-file-paths').innerHTML =
+          `Saved locally:<br>${rankPaths.map(path => `<code>${escHtml(path)}</code>`).join('<br>')}`;
+        showEl('rank-file-paths');
+      }
       document.getElementById('gap-csv-link').href = seoDownloadUrl(
         data.seo_gap_report.csv_download_url || data.seo_gap_report.csv_url
       );
       document.getElementById('gap-xlsx-link').href = seoDownloadUrl(
         data.seo_gap_report.xlsx_download_url || data.seo_gap_report.xlsx_url
       );
+      const gapPaths = [data.seo_gap_report.xlsx_path, data.seo_gap_report.csv_path].filter(Boolean);
+      if (gapPaths.length) {
+        document.getElementById('gap-file-paths').innerHTML =
+          `Saved locally:<br>${gapPaths.map(path => `<code>${escHtml(path)}</code>`).join('<br>')}`;
+        showEl('gap-file-paths');
+      }
       showEl('seo-results-card');
       document.getElementById('seo-results-card').scrollIntoView({ behavior: 'smooth' });
     } catch (error) {

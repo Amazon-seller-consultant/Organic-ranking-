@@ -2163,7 +2163,7 @@ def _parse_seo_ads_rows(targeting_content: bytes, advertised_content: bytes) -> 
         if campaign and asin:
             asin_map.setdefault((campaign, ad_group), set()).add(asin)
 
-    aggregated: dict[tuple[str, str, str], dict] = {}
+    aggregated: dict[tuple[str, str, str, str, str], dict] = {}
     valid_match_types = {"BROAD", "PHRASE", "EXACT"}
     for row in targeting_rows:
         match_type = _norm_text(_row_get(row, "Match Type")).upper()
@@ -2174,8 +2174,10 @@ def _parse_seo_ads_rows(targeting_content: bytes, advertised_content: bytes) -> 
         if not keyword or keyword in {"-", "*"} or "placeholder keyword" in keyword.lower():
             continue
 
-        campaign = _norm_key(_row_get(row, "Campaign Name", "Campaign"))
-        ad_group = _norm_key(_row_get(row, "Ad Group Name", "Ad Group"))
+        campaign_name = _norm_text(_row_get(row, "Campaign Name", "Campaign"))
+        ad_group_name = _norm_text(_row_get(row, "Ad Group Name", "Ad Group"))
+        campaign = _norm_key(campaign_name)
+        ad_group = _norm_key(ad_group_name)
         asins = asin_map.get((campaign, ad_group), set())
         if not asins:
             continue
@@ -2187,11 +2189,13 @@ def _parse_seo_ads_rows(targeting_content: bytes, advertised_content: bytes) -> 
         keyword_key = _keyword_key(keyword)
 
         for asin in asins:
-            key = (asin, keyword_key, match_type)
+            key = (asin, keyword_key, campaign, ad_group, match_type)
             item = aggregated.setdefault(key, {
                 "asin": asin,
                 "keyword": keyword.strip(),
                 "keyword_key": keyword_key,
+                "campaign": campaign_name,
+                "ad_group": ad_group_name,
                 "match_type": match_type,
                 "impressions": 0.0,
                 "clicks": 0.0,
@@ -2514,31 +2518,20 @@ async def seo_gap_analysis(
     }
     marketplace_by_asin = {entry["asin"]: entry["marketplace"] for entry in entries}
 
-    ads_lookup: dict[tuple[str, str], dict] = {}
+    allowed_keys = {(entry["asin"], _keyword_key(entry["term"])) for entry in entries}
+    ads_lookup: dict[tuple[str, str], list[dict]] = {}
     for row in ads_rows:
         key = (row["asin"], row["keyword_key"])
-        item = ads_lookup.setdefault(key, {
-            **row,
-            "match_types": set(),
-            "impressions": 0.0,
-            "clicks": 0.0,
-            "spend": 0.0,
-            "orders": 0.0,
-            "sales": 0.0,
-        })
-        item["match_types"].add(row["match_type"])
-        for metric in ("impressions", "clicks", "spend", "orders", "sales"):
-            item[metric] += row[metric]
+        if key in allowed_keys:
+            ads_lookup.setdefault(key, []).append(row)
 
     keyword_labels = {
         (item["asin"], _keyword_key(item["term"])): item["term"] for item in ranks
     }
-    for key, item in ads_lookup.items():
-        keyword_labels.setdefault(key, item["keyword"])
 
     all_keys = set(keyword_labels)
     gap_headers = [
-        "ASIN", "Keyword", "Match Type", "In Ads", "In Organic", "Organic Rank",
+        "ASIN", "Keyword", "Campaign Name", "Ad Group Name", "Match Type", "In Ads", "In Organic", "Organic Rank",
         "Live Sponsored Presence", "Live Sponsored Pages", "Bucket",
         "Impressions", "Clicks", "CTR", "CVR", "Orders", "Sales",
         "Spend", "ROAS", "Priority Score"
@@ -2546,9 +2539,9 @@ async def seo_gap_analysis(
     gap_rows = []
     bucket_counts = {"Winning": 0, "Paid Only": 0, "Organic Only": 0, "Gap": 0}
     for asin, keyword_key in sorted(all_keys):
-        ad = ads_lookup.get((asin, keyword_key))
+        ad_rows = ads_lookup.get((asin, keyword_key), [])
         rank = rank_lookup.get((asin, keyword_key))
-        in_ads = ad is not None
+        in_ads = bool(ad_rows)
         in_organic = bool(rank and rank["found"])
         if in_ads and in_organic:
             bucket = "Winning"
@@ -2558,44 +2551,48 @@ async def seo_gap_analysis(
             bucket = "Organic Only"
         else:
             bucket = "Gap"
-        bucket_counts[bucket] += 1
+        output_rows = ad_rows or [None]
+        bucket_counts[bucket] += len(output_rows)
 
-        impressions = ad["impressions"] if ad else None
-        clicks = ad["clicks"] if ad else None
-        spend = ad["spend"] if ad else None
-        orders = ad["orders"] if ad else None
-        sales = ad["sales"] if ad else None
-        ctr = (clicks / impressions * 100) if ad and impressions > 0 else None
-        cvr = (orders / clicks * 100) if ad and clicks > 0 else None
-        roas = (sales / spend) if ad and spend > 0 else None
-        priority = (
-            cvr * roas * math.log(impressions + 1)
-            if bucket == "Paid Only" and cvr is not None and roas is not None
-            else None
-        )
+        for ad in output_rows:
+            impressions = ad["impressions"] if ad else None
+            clicks = ad["clicks"] if ad else None
+            spend = ad["spend"] if ad else None
+            orders = ad["orders"] if ad else None
+            sales = ad["sales"] if ad else None
+            ctr = (clicks / impressions * 100) if ad and impressions > 0 else None
+            cvr = (orders / clicks * 100) if ad and clicks > 0 else None
+            roas = (sales / spend) if ad and spend > 0 else None
+            priority = (
+                cvr * roas * math.log(impressions + 1)
+                if bucket == "Paid Only" and cvr is not None and roas is not None
+                else None
+            )
 
-        gap_rows.append([
-            asin,
-            keyword_labels[(asin, keyword_key)],
-            ", ".join(sorted(ad["match_types"])) if ad else "",
-            "YES" if in_ads else "NO",
-            "YES" if in_organic else "NO",
-            rank["position"] if in_organic else "Not ranked",
-            "YES" if rank and rank.get("sponsored_found") else "NO",
-            ", ".join(
-                str(match["page"]) for match in (rank or {}).get("sponsored_matches", [])
-            ),
-            bucket,
-            round(impressions, 2) if impressions is not None else "",
-            round(clicks, 2) if clicks is not None else "",
-            round(ctr, 4) if ctr is not None else "",
-            round(cvr, 4) if cvr is not None else "",
-            round(orders, 2) if orders is not None else "",
-            round(sales, 2) if sales is not None else "",
-            round(spend, 2) if spend is not None else "",
-            round(roas, 4) if roas is not None else "",
-            round(priority, 4) if priority is not None else "",
-        ])
+            gap_rows.append([
+                asin,
+                keyword_labels[(asin, keyword_key)],
+                ad["campaign"] if ad else "",
+                ad["ad_group"] if ad else "",
+                ad["match_type"] if ad else "",
+                "YES" if in_ads else "NO",
+                "YES" if in_organic else "NO",
+                rank["position"] if in_organic else "Not ranked",
+                "YES" if rank and rank.get("sponsored_found") else "NO",
+                ", ".join(
+                    str(match["page"]) for match in (rank or {}).get("sponsored_matches", [])
+                ),
+                bucket,
+                round(impressions, 2) if impressions is not None else "",
+                round(clicks, 2) if clicks is not None else "",
+                round(ctr, 4) if ctr is not None else "",
+                round(cvr, 4) if cvr is not None else "",
+                round(orders, 2) if orders is not None else "",
+                round(sales, 2) if sales is not None else "",
+                round(spend, 2) if spend is not None else "",
+                round(roas, 4) if roas is not None else "",
+                round(priority, 4) if priority is not None else "",
+            ])
 
     rank_files = _write_report_files("rank_report", rank_headers, rank_rows)
     gap_files = _write_report_files("seo_gap_report", gap_headers, gap_rows)
@@ -2608,7 +2605,7 @@ async def seo_gap_analysis(
             "rank_checks": len(ranks),
             "ranked": sum(1 for item in ranks if item["found"]),
             "sponsored": sum(1 for item in ranks if item.get("sponsored_found")),
-            "ads_keywords": len(ads_lookup),
+            "ads_keywords": sum(len(rows) for rows in ads_lookup.values()),
             "buckets": bucket_counts,
             "providers": {
                 "canopy": sum(1 for item in ranks if item.get("provider") == "Canopy"),
