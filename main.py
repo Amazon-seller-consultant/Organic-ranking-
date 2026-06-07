@@ -1715,6 +1715,8 @@ def _write_report_files(prefix: str, headers: list[str], rows: list[list]) -> di
     return {
         "csv_url": f"/static/exports/{csv_name}",
         "xlsx_url": f"/static/exports/{xlsx_name}",
+        "csv_download_url": f"/api/download/{csv_name}",
+        "xlsx_download_url": f"/api/download/{xlsx_name}",
         "csv_name": csv_name,
         "xlsx_name": xlsx_name,
     }
@@ -1888,8 +1890,33 @@ async def save_csv(req: CSVExportRequest):
     return {
         "filename": safe_name,
         "url": f"/static/exports/{safe_name}",
+        "download_url": f"/api/download/{safe_name}",
         "path": str(output_path),
     }
+
+
+@app.get("/api/download/{filename}")
+async def download_export(filename: str):
+    safe_name = Path(filename).name
+    if safe_name != filename or not safe_name.lower().endswith((".csv", ".xlsx")):
+        raise HTTPException(status_code=400, detail="Invalid report filename.")
+
+    export_dir = Path(__file__).parent / "static" / "exports"
+    output_path = export_dir / safe_name
+    if not output_path.is_file():
+        raise HTTPException(status_code=404, detail="Report file not found.")
+
+    media_type = (
+        "text/csv; charset=utf-8"
+        if output_path.suffix.lower() == ".csv"
+        else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    return FileResponse(
+        output_path,
+        media_type=media_type,
+        filename=safe_name,
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")

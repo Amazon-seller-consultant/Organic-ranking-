@@ -1522,10 +1522,18 @@
         <div class="summary-stat"><div class="val">${providers.canopy || 0}</div><div class="lbl">Canopy Checks</div></div>
         <div class="summary-stat"><div class="val val-orange">${providers.serpapi_backup || 0}</div><div class="lbl">SerpAPI Backups</div></div>
       `;
-      document.getElementById('rank-csv-link').href = seoDownloadUrl(data.rank_report.csv_url);
-      document.getElementById('rank-xlsx-link').href = seoDownloadUrl(data.rank_report.xlsx_url);
-      document.getElementById('gap-csv-link').href = seoDownloadUrl(data.seo_gap_report.csv_url);
-      document.getElementById('gap-xlsx-link').href = seoDownloadUrl(data.seo_gap_report.xlsx_url);
+      document.getElementById('rank-csv-link').href = seoDownloadUrl(
+        data.rank_report.csv_download_url || data.rank_report.csv_url
+      );
+      document.getElementById('rank-xlsx-link').href = seoDownloadUrl(
+        data.rank_report.xlsx_download_url || data.rank_report.xlsx_url
+      );
+      document.getElementById('gap-csv-link').href = seoDownloadUrl(
+        data.seo_gap_report.csv_download_url || data.seo_gap_report.csv_url
+      );
+      document.getElementById('gap-xlsx-link').href = seoDownloadUrl(
+        data.seo_gap_report.xlsx_download_url || data.seo_gap_report.xlsx_url
+      );
       showEl('seo-results-card');
       document.getElementById('seo-results-card').scrollIntoView({ behavior: 'smooth' });
     } catch (error) {
