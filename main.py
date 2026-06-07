@@ -35,16 +35,16 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 CANOPY_API_KEY = os.getenv("CANOPY_API_KEY", "")
 
 SERPAPI_BASE = "https://serpapi.com/search"
-MAX_PAGES = 3
+MAX_PAGES = 5
 PAGE_SIZE = 16  # Amazon typically shows 16-24 results per page
 SERPAPI_CONCURRENCY = max(1, int(os.getenv("SERPAPI_CONCURRENCY", "6")))
 RANK_CACHE_TTL_SECONDS = max(0, int(os.getenv("RANK_CACHE_TTL_SECONDS", "21600")))
 AI_CONCURRENCY = max(1, int(os.getenv("AI_CONCURRENCY", "2")))
 CANOPY_CONCURRENCY = max(1, int(os.getenv("CANOPY_CONCURRENCY", "5")))
-CANOPY_MAX_PAGES = max(1, int(os.getenv("CANOPY_MAX_PAGES", "3")))
+CANOPY_MAX_PAGES = 5
 CANOPY_SEARCH_URL = "https://rest.canopyapi.co/api/amazon/search"
 
-_rank_cache: dict[tuple[str, str, str], tuple[float, dict]] = {}
+_rank_cache: dict[tuple[str, str, str, str], tuple[float, dict]] = {}
 
 
 @app.exception_handler(Exception)
@@ -261,13 +261,14 @@ async def search_term_ranking(client: httpx.AsyncClient, asin: str, term: str, m
     """Search Amazon for a keyword and find the ASIN's position."""
     asin = asin.upper()
     term = term.strip()
-    cache_key = (marketplace.lower(), asin, term.lower())
+    cache_key = ("rank-v2", marketplace.lower(), asin, term.lower())
     cached = _rank_cache.get(cache_key)
     if cached and time.monotonic() - cached[0] < RANK_CACHE_TTL_SECONDS:
         return dict(cached[1])
 
     position_overall = None
     found_page = None
+    sponsored_matches = []
 
     for page_num in range(1, MAX_PAGES + 1):
         params = {
@@ -297,18 +298,29 @@ async def search_term_ranking(client: httpx.AsyncClient, asin: str, term: str, m
                 raise HTTPException(status_code=502, detail=f"SerpAPI error: {data['error']}")
 
             organic = data.get("organic_results", [])
-            if not organic:
-                break
+            sponsored = (
+                data.get("sponsored_products")
+                or data.get("sponsored_results")
+                or data.get("ads")
+                or []
+            )
+            for index, item in enumerate(sponsored, 1):
+                if (item.get("asin") or "").upper() == asin:
+                    sponsored_matches.append({
+                        "page": page_num,
+                        "position": int(_num(item.get("position")) or index),
+                    })
 
-            for index, item in enumerate(organic, 1):
-                item_asin = (item.get("asin") or "").upper()
-                if item_asin == asin:
-                    pos_in_page = item.get("position", index)
-                    position_overall = (page_num - 1) * PAGE_SIZE + pos_in_page
-                    found_page = page_num
-                    break
+            if position_overall is None:
+                for index, item in enumerate(organic, 1):
+                    item_asin = (item.get("asin") or "").upper()
+                    if item_asin == asin:
+                        pos_in_page = item.get("position", index)
+                        position_overall = (page_num - 1) * PAGE_SIZE + pos_in_page
+                        found_page = page_num
+                        break
 
-            if position_overall is not None:
+            if not organic and not sponsored:
                 break
 
         except HTTPException:
@@ -321,6 +333,8 @@ async def search_term_ranking(client: httpx.AsyncClient, asin: str, term: str, m
         "position": position_overall,
         "page": found_page,
         "found": position_overall is not None,
+        "sponsored_found": bool(sponsored_matches),
+        "sponsored_matches": sponsored_matches,
     }
     if RANK_CACHE_TTL_SECONDS:
         _rank_cache[cache_key] = (time.monotonic(), result)
@@ -1931,6 +1945,10 @@ async def _canopy_rank(
             "Canopy API is not configured.",
         )
 
+    organic_rank = None
+    organic_page = None
+    sponsored_matches = []
+
     for page in range(1, CANOPY_MAX_PAGES + 1):
         try:
             response = await client.get(
@@ -1966,25 +1984,24 @@ async def _canopy_rank(
             )
 
         results = _canopy_results(data)
+        organic_index = 0
         for index, item in enumerate(results, 1):
-            if _canopy_is_sponsored(item):
-                continue
             item_asin = _norm_text(
                 item.get("asin") or item.get("ASIN") or item.get("productAsin")
             ).upper()
-            if item_asin == asin:
-                raw_position = int(_num(item.get("position")) or index)
-                rank = raw_position if raw_position > 20 else (page - 1) * 20 + raw_position
-                return {
-                    "asin": asin,
-                    "marketplace": marketplace,
-                    "term": term,
-                    "position": rank,
-                    "page": page,
-                    "found": True,
-                    "checked_at": checked_at,
-                    "provider": "Canopy",
-                }
+            raw_position = int(_num(item.get("position")) or index)
+            if _canopy_is_sponsored(item):
+                if item_asin == asin:
+                    sponsored_matches.append({
+                        "page": page,
+                        "position": raw_position,
+                    })
+                continue
+
+            organic_index += 1
+            if item_asin == asin and organic_rank is None:
+                organic_rank = (page - 1) * 20 + organic_index
+                organic_page = page
         if not results:
             break
 
@@ -1992,9 +2009,11 @@ async def _canopy_rank(
         "asin": asin,
         "marketplace": marketplace,
         "term": term,
-        "position": None,
-        "page": None,
-        "found": False,
+        "position": organic_rank,
+        "page": organic_page,
+        "found": organic_rank is not None,
+        "sponsored_found": bool(sponsored_matches),
+        "sponsored_matches": sponsored_matches,
         "checked_at": checked_at,
         "provider": "Canopy",
     }
@@ -2098,7 +2117,8 @@ async def seo_gap_analysis(
     ranks = await _canopy_rank_entries(entries)
 
     rank_headers = [
-        "ASIN", "Marketplace", "Search Term", "Organic Rank", "Rank Page", "Checked At"
+        "ASIN", "Marketplace", "Search Term", "Organic Rank", "Rank Page",
+        "Sponsored Presence", "Sponsored Pages", "Sponsored Positions", "Checked At"
     ]
     rank_rows = [
         [
@@ -2107,6 +2127,12 @@ async def seo_gap_analysis(
             item["term"],
             item["position"] if item["found"] else "Not ranked",
             item["page"] if item["found"] else "",
+            "YES" if item.get("sponsored_found") else "NO",
+            ", ".join(str(match["page"]) for match in item.get("sponsored_matches", [])),
+            ", ".join(
+                f"Page {match['page']} position {match['position']}"
+                for match in item.get("sponsored_matches", [])
+            ),
             item["checked_at"],
         ]
         for item in ranks
@@ -2143,7 +2169,8 @@ async def seo_gap_analysis(
     all_keys = set(keyword_labels)
     gap_headers = [
         "ASIN", "Keyword", "Match Type", "In Ads", "In Organic", "Organic Rank",
-        "Bucket", "Impressions", "Clicks", "CTR", "CVR", "Orders", "Sales",
+        "Live Sponsored Presence", "Live Sponsored Pages", "Bucket",
+        "Impressions", "Clicks", "CTR", "CVR", "Orders", "Sales",
         "Spend", "ROAS", "Priority Score"
     ]
     gap_rows = []
@@ -2184,6 +2211,10 @@ async def seo_gap_analysis(
             "YES" if in_ads else "NO",
             "YES" if in_organic else "NO",
             rank["position"] if in_organic else "Not ranked",
+            "YES" if rank and rank.get("sponsored_found") else "NO",
+            ", ".join(
+                str(match["page"]) for match in (rank or {}).get("sponsored_matches", [])
+            ),
             bucket,
             round(impressions, 2) if impressions is not None else "",
             round(clicks, 2) if clicks is not None else "",
@@ -2206,6 +2237,7 @@ async def seo_gap_analysis(
             "asins": len({entry["asin"] for entry in entries}),
             "rank_checks": len(ranks),
             "ranked": sum(1 for item in ranks if item["found"]),
+            "sponsored": sum(1 for item in ranks if item.get("sponsored_found")),
             "ads_keywords": len(ads_lookup),
             "buckets": bucket_counts,
             "providers": {

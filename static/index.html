@@ -1433,7 +1433,11 @@
       </div>
       <div class="summary-stat">
         <div class="val val-red">${notFound.length}</div>
-        <div class="lbl">Not Found (top 3 pages)</div>
+        <div class="lbl">Not Found (top 5 pages)</div>
+      </div>
+      <div class="summary-stat">
+        <div class="val val-orange">${results.filter(r => r.sponsored_found).length}</div>
+        <div class="lbl">Sponsored Presence</div>
       </div>
     `;
 
@@ -1453,7 +1457,10 @@
 
         rankEl = `<span class="rank-badge ${rankClass}">#${r.position}</span>`;
         const pageEl = `<span class="page-badge">Page ${r.page}</span>`;
-        statusEl = `<span style="color:var(--success);font-size:13px;">✓ Ranked</span>`;
+        const adStatus = r.sponsored_found
+          ? `<br><span style="color:var(--accent);font-size:12px;">Ad on page${r.sponsored_matches.length > 1 ? 's' : ''} ${r.sponsored_matches.map(m => m.page).join(', ')}</span>`
+          : '';
+        statusEl = `<span style="color:var(--success);font-size:13px;">✓ Ranked</span>${adStatus}`;
 
         return `<tr>
           <td style="font-weight:500">${escHtml(r.term)}</td>
@@ -1466,7 +1473,9 @@
           <td style="font-weight:500">${escHtml(r.term)}</td>
           <td><span class="rank-badge rank-none">—</span></td>
           <td><span class="page-badge">—</span></td>
-          <td><span style="color:var(--text-muted);font-size:13px;">Not in top 3 pages</span></td>
+          <td><span style="color:var(--text-muted);font-size:13px;">Not in top 5 pages</span>${r.sponsored_found
+            ? `<br><span style="color:var(--accent);font-size:12px;">Ad on page${r.sponsored_matches.length > 1 ? 's' : ''} ${r.sponsored_matches.map(m => m.page).join(', ')}</span>`
+            : ''}</td>
         </tr>`;
       }
     }).join('');
@@ -1474,13 +1483,16 @@
 
   function exportCSV() {
     if (!lastResults.length) return;
-    const rows = [['Search Term', 'Position', 'Page', 'Status', 'ASIN']];
+    const rows = [['Search Term', 'Organic Position', 'Organic Page', 'Status', 'Sponsored Presence', 'Sponsored Pages', 'Sponsored Positions', 'ASIN']];
     lastResults.forEach(r => {
       rows.push([
         `"${r.term}"`,
         r.found ? r.position : '',
         r.found ? r.page : '',
         r.found ? 'Ranked' : 'Not found',
+        r.sponsored_found ? 'YES' : 'NO',
+        `"${(r.sponsored_matches || []).map(m => m.page).join(', ')}"`,
+        `"${(r.sponsored_matches || []).map(m => `Page ${m.page} position ${m.position}`).join(', ')}"`,
         currentASIN
       ]);
     });
@@ -1610,6 +1622,7 @@
         <div class="summary-stat"><div class="val val-green">${summary.ranked}</div><div class="lbl">Ranked Terms</div></div>
         <div class="summary-stat"><div class="val" style="color:#60a5fa">${buckets['Paid Only'] || 0}</div><div class="lbl">Paid Only</div></div>
         <div class="summary-stat"><div class="val val-orange">${buckets['Organic Only'] || 0}</div><div class="lbl">Organic Only</div></div>
+        <div class="summary-stat"><div class="val val-orange">${summary.sponsored || 0}</div><div class="lbl">Sponsored Presence</div></div>
         <div class="summary-stat"><div class="val">${providers.canopy || 0}</div><div class="lbl">Canopy Checks</div></div>
         <div class="summary-stat"><div class="val val-orange">${providers.serpapi_backup || 0}</div><div class="lbl">SerpAPI Backups</div></div>
       `;
@@ -2072,11 +2085,12 @@
   }
 
   function renderBulkResults(results) {
-    let totalTerms = 0, totalFound = 0, totalTop10 = 0;
+    let totalTerms = 0, totalFound = 0, totalTop10 = 0, totalSponsored = 0;
     results.forEach(r => {
       totalTerms += r.rankings.length;
       totalFound += r.rankings.filter(x => x.found).length;
       totalTop10 += r.rankings.filter(x => x.found && x.position <= 10).length;
+      totalSponsored += r.rankings.filter(x => x.sponsored_found).length;
     });
 
     document.getElementById('bulk-summary-bar').innerHTML = `
@@ -2084,6 +2098,7 @@
       <div class="summary-stat"><div class="val">${totalTerms}</div><div class="lbl">Total Searches</div></div>
       <div class="summary-stat"><div class="val val-green">${totalFound}</div><div class="lbl">Terms Found</div></div>
       <div class="summary-stat"><div class="val val-green">${totalTop10}</div><div class="lbl">Top 10 Rankings</div></div>
+      <div class="summary-stat"><div class="val val-orange">${totalSponsored}</div><div class="lbl">Sponsored Presence</div></div>
     `;
 
     document.getElementById('bulk-results-body').innerHTML = results.map((r, bi) => {
@@ -2101,7 +2116,8 @@
           <td style="font-weight:500;padding-left:24px">${escHtml(x.term)}</td>
           <td>${rankEl}</td>
           <td>${x.found ? `<span class="page-badge">Page ${x.page}</span>` : '<span class="page-badge">—</span>'}</td>
-          <td>${x.found ? '<span style="color:var(--success);font-size:13px;">✓ Ranked</span>' : '<span style="color:var(--text-muted);font-size:13px;">Not found</span>'}</td>
+          <td>${x.found ? '<span style="color:var(--success);font-size:13px;">✓ Ranked</span>' : '<span style="color:var(--text-muted);font-size:13px;">Not in top 5 pages</span>'}
+            ${x.sponsored_found ? `<br><span style="color:var(--accent);font-size:12px;">Ad on page${x.sponsored_matches.length > 1 ? 's' : ''} ${x.sponsored_matches.map(m => m.page).join(', ')}</span>` : ''}</td>
         </tr>`;
       }).join('');
 
@@ -2247,12 +2263,15 @@
 
   function exportBulkCSV() {
     if (!bulkResults.length) return;
-    const rows = [['ASIN','Marketplace','Search Term','Position','Page','Status']];
+    const rows = [['ASIN','Marketplace','Search Term','Organic Position','Organic Page','Status','Sponsored Presence','Sponsored Pages','Sponsored Positions']];
     bulkResults.forEach(r => {
       r.rankings.forEach(x => {
         rows.push([r.asin, r.marketplace, `"${x.term}"`,
           x.found ? x.position : '', x.found ? x.page : '',
-          x.found ? 'Ranked' : 'Not found']);
+          x.found ? 'Ranked' : 'Not found',
+          x.sponsored_found ? 'YES' : 'NO',
+          `"${(x.sponsored_matches || []).map(m => m.page).join(', ')}"`,
+          `"${(x.sponsored_matches || []).map(m => `Page ${m.page} position ${m.position}`).join(', ')}"`]);
       });
     });
     const csv = rows.map(r => r.join(',')).join('\n');
