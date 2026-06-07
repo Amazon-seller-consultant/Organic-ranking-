@@ -42,10 +42,8 @@ RANK_CACHE_TTL_SECONDS = max(0, int(os.getenv("RANK_CACHE_TTL_SECONDS", "21600")
 AI_CONCURRENCY = max(1, int(os.getenv("AI_CONCURRENCY", "2")))
 CANOPY_CONCURRENCY = max(1, int(os.getenv("CANOPY_CONCURRENCY", "5")))
 CANOPY_MAX_PAGES = max(1, int(os.getenv("CANOPY_MAX_PAGES", "3")))
-CANOPY_SEARCH_URL = "https://api.canopyapi.co/v1/amazon/search"
+CANOPY_SEARCH_URL = "https://rest.canopyapi.co/api/amazon/search"
 
-_serpapi_semaphore = asyncio.Semaphore(SERPAPI_CONCURRENCY)
-_canopy_semaphore = asyncio.Semaphore(CANOPY_CONCURRENCY)
 _rank_cache: dict[tuple[str, str, str], tuple[float, dict]] = {}
 
 
@@ -271,53 +269,52 @@ async def search_term_ranking(client: httpx.AsyncClient, asin: str, term: str, m
     position_overall = None
     found_page = None
 
-    async with _serpapi_semaphore:
-        for page_num in range(1, MAX_PAGES + 1):
-            params = {
-                "engine": "amazon",
-                "k": term,
-                "amazon_domain": marketplace,
-                "page": page_num,
-                "api_key": SERPAPI_KEY,
-            }
+    for page_num in range(1, MAX_PAGES + 1):
+        params = {
+            "engine": "amazon",
+            "k": term,
+            "amazon_domain": marketplace,
+            "page": page_num,
+            "api_key": SERPAPI_KEY,
+        }
+
+        try:
+            resp = await client.get(SERPAPI_BASE, params=params, timeout=30)
+            if resp.status_code != 200:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"SerpAPI error: {resp.text[:300] or f'HTTP {resp.status_code}'}",
+                )
 
             try:
-                resp = await client.get(SERPAPI_BASE, params=params, timeout=30)
-                if resp.status_code != 200:
-                    raise HTTPException(
-                        status_code=502,
-                        detail=f"SerpAPI error: {resp.text[:300] or f'HTTP {resp.status_code}'}",
-                    )
+                data = resp.json()
+            except Exception:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"SerpAPI returned an invalid response: {resp.text[:300]}",
+                )
+            if "error" in data:
+                raise HTTPException(status_code=502, detail=f"SerpAPI error: {data['error']}")
 
-                try:
-                    data = resp.json()
-                except Exception:
-                    raise HTTPException(
-                        status_code=502,
-                        detail=f"SerpAPI returned an invalid response: {resp.text[:300]}",
-                    )
-                if "error" in data:
-                    raise HTTPException(status_code=502, detail=f"SerpAPI error: {data['error']}")
+            organic = data.get("organic_results", [])
+            if not organic:
+                break
 
-                organic = data.get("organic_results", [])
-                if not organic:
+            for index, item in enumerate(organic, 1):
+                item_asin = (item.get("asin") or "").upper()
+                if item_asin == asin:
+                    pos_in_page = item.get("position", index)
+                    position_overall = (page_num - 1) * PAGE_SIZE + pos_in_page
+                    found_page = page_num
                     break
 
-                for index, item in enumerate(organic, 1):
-                    item_asin = (item.get("asin") or "").upper()
-                    if item_asin == asin:
-                        pos_in_page = item.get("position", index)
-                        position_overall = (page_num - 1) * PAGE_SIZE + pos_in_page
-                        found_page = page_num
-                        break
+            if position_overall is not None:
+                break
 
-                if position_overall is not None:
-                    break
-
-            except HTTPException:
-                raise
-            except Exception as e:
-                raise HTTPException(status_code=502, detail=f"SerpAPI request failed: {e}")
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"SerpAPI request failed: {e}")
 
     result = {
         "term": term,
@@ -346,9 +343,15 @@ async def _rank_entries(entries: list[dict]) -> list[dict]:
         max_connections=max(SERPAPI_CONCURRENCY * 2, 10),
         max_keepalive_connections=max(SERPAPI_CONCURRENCY, 5),
     )
+    semaphore = asyncio.Semaphore(SERPAPI_CONCURRENCY)
+
+    async def run_limited(asin: str, marketplace: str, term: str) -> dict:
+        async with semaphore:
+            return await search_term_ranking(client, asin, term, marketplace)
+
     async with httpx.AsyncClient(limits=limits, timeout=35) as client:
         unique_rankings = await asyncio.gather(*[
-            search_term_ranking(client, asin, term, marketplace)
+            run_limited(asin, marketplace, term)
             for asin, marketplace, term in unique_jobs.values()
         ])
     ranking_by_key = dict(zip(unique_jobs, unique_rankings))
@@ -1501,14 +1504,35 @@ def _marketplace_domain(marketplace: str) -> str:
 
 def _canopy_results(data) -> list[dict]:
     if isinstance(data, dict):
-        for key in ("searchResults", "search_results", "results", "products", "items"):
+        product_results = data.get("productResults")
+        if isinstance(product_results, dict):
+            results = product_results.get("results")
+            if isinstance(results, list):
+                return [item for item in results if isinstance(item, dict)]
+
+        for key in ("amazonProductSearchResults", "searchResults", "search_results"):
+            value = data.get(key)
+            if isinstance(value, dict):
+                found = _canopy_results(value)
+                if found:
+                    return found
+
+        for key in ("products", "items", "results"):
             value = data.get(key)
             if isinstance(value, list):
-                return [item for item in value if isinstance(item, dict)]
+                products = [
+                    item for item in value
+                    if isinstance(item, dict) and (
+                        item.get("asin") or item.get("ASIN") or item.get("productAsin")
+                    )
+                ]
+                if products:
+                    return products
         for value in data.values():
-            found = _canopy_results(value)
-            if found:
-                return found
+            if isinstance(value, dict):
+                found = _canopy_results(value)
+                if found:
+                    return found
     return []
 
 
@@ -1564,63 +1588,62 @@ async def _canopy_rank(
             "Canopy API is not configured.",
         )
 
-    async with _canopy_semaphore:
-        for page in range(1, CANOPY_MAX_PAGES + 1):
-            try:
-                response = await client.get(
-                    CANOPY_SEARCH_URL,
-                    params={
-                        "searchTerm": term,
-                        "domain": _marketplace_domain(marketplace),
-                        "page": page,
-                    },
-                    headers={
-                        "API-KEY": CANOPY_API_KEY,
-                        "Authorization": f"Bearer {CANOPY_API_KEY}",
-                    },
-                    timeout=45,
-                )
-            except Exception as exc:
-                return await _serpapi_backup_rank(
-                    client, asin, term, marketplace,
-                    f"Canopy API request failed: {exc}.",
-                )
+    for page in range(1, CANOPY_MAX_PAGES + 1):
+        try:
+            response = await client.get(
+                CANOPY_SEARCH_URL,
+                params={
+                    "searchTerm": term,
+                    "domain": _marketplace_domain(marketplace),
+                    "page": page,
+                },
+                headers={
+                    "API-KEY": CANOPY_API_KEY,
+                    "Authorization": f"Bearer {CANOPY_API_KEY}",
+                },
+                timeout=45,
+            )
+        except Exception as exc:
+            return await _serpapi_backup_rank(
+                client, asin, term, marketplace,
+                f"Canopy API request failed: {exc}.",
+            )
 
-            if response.status_code != 200:
-                return await _serpapi_backup_rank(
-                    client, asin, term, marketplace,
-                    f"Canopy API error: {response.text[:300] or f'HTTP {response.status_code}'}.",
-                )
-            try:
-                data = response.json()
-            except Exception as exc:
-                return await _serpapi_backup_rank(
-                    client, asin, term, marketplace,
-                    f"Canopy API returned invalid JSON: {response.text[:250]}.",
-                )
+        if response.status_code != 200:
+            return await _serpapi_backup_rank(
+                client, asin, term, marketplace,
+                f"Canopy API error: {response.text[:300] or f'HTTP {response.status_code}'}.",
+            )
+        try:
+            data = response.json()
+        except Exception:
+            return await _serpapi_backup_rank(
+                client, asin, term, marketplace,
+                f"Canopy API returned invalid JSON: {response.text[:250]}.",
+            )
 
-            results = _canopy_results(data)
-            for index, item in enumerate(results, 1):
-                if _canopy_is_sponsored(item):
-                    continue
-                item_asin = _norm_text(
-                    item.get("asin") or item.get("ASIN") or item.get("productAsin")
-                ).upper()
-                if item_asin == asin:
-                    raw_position = int(_num(item.get("position")) or index)
-                    rank = raw_position if raw_position > 20 else (page - 1) * 20 + raw_position
-                    return {
-                        "asin": asin,
-                        "marketplace": marketplace,
-                        "term": term,
-                        "position": rank,
-                        "page": page,
-                        "found": True,
-                        "checked_at": checked_at,
-                        "provider": "Canopy",
-                    }
-            if not results:
-                break
+        results = _canopy_results(data)
+        for index, item in enumerate(results, 1):
+            if _canopy_is_sponsored(item):
+                continue
+            item_asin = _norm_text(
+                item.get("asin") or item.get("ASIN") or item.get("productAsin")
+            ).upper()
+            if item_asin == asin:
+                raw_position = int(_num(item.get("position")) or index)
+                rank = raw_position if raw_position > 20 else (page - 1) * 20 + raw_position
+                return {
+                    "asin": asin,
+                    "marketplace": marketplace,
+                    "term": term,
+                    "position": rank,
+                    "page": page,
+                    "found": True,
+                    "checked_at": checked_at,
+                    "provider": "Canopy",
+                }
+        if not results:
+            break
 
     return {
         "asin": asin,
@@ -1644,9 +1667,15 @@ async def _canopy_rank_entries(entries: list[dict]) -> list[dict]:
         max_connections=max(CANOPY_CONCURRENCY * 2, 10),
         max_keepalive_connections=max(CANOPY_CONCURRENCY, 5),
     )
+    semaphore = asyncio.Semaphore(CANOPY_CONCURRENCY)
+
+    async def run_limited(asin: str, marketplace: str, term: str) -> dict:
+        async with semaphore:
+            return await _canopy_rank(client, asin, term, marketplace)
+
     async with httpx.AsyncClient(limits=limits, timeout=50) as client:
         return await asyncio.gather(*[
-            _canopy_rank(client, asin, term, marketplace)
+            run_limited(asin, marketplace, term)
             for asin, marketplace, term in jobs
         ])
 
