@@ -951,6 +951,10 @@
         <div class="card-title" id="audit-report-title">Amazon Ads Report</div>
         <div id="audit-warning" class="status-msg status-error hidden"></div>
         <div id="audit-executive" style="font-size:14px;line-height:1.65;"></div>
+        <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+          <a class="btn btn-secondary" id="audit-csv-link" download>Download CSV</a>
+          <a class="btn btn-primary" id="audit-xlsx-link" download>Download Excel</a>
+        </div>
       </div>
       <div class="card">
         <div class="card-title">🔴 Action Required</div>
@@ -2809,6 +2813,14 @@
       document.getElementById('audit-insufficient').innerHTML = renderAuditCards(data.insufficient, 'insufficient');
       document.getElementById('audit-recommendations').innerHTML = data.recommendations.map(x => `<li>${escHtml(x)}</li>`).join('');
       document.getElementById('audit-caveats').innerHTML = [...data.caveats, ...(data.parse_warnings || [])].map(x => `<li>${escHtml(x)}</li>`).join('');
+      if (data.ads_audit_report) {
+        document.getElementById('audit-csv-link').href = seoDownloadUrl(
+          data.ads_audit_report.csv_download_url || data.ads_audit_report.csv_url
+        );
+        document.getElementById('audit-xlsx-link').href = seoDownloadUrl(
+          data.ads_audit_report.xlsx_download_url || data.ads_audit_report.xlsx_url
+        );
+      }
       document.getElementById('audit-progress-fill').style.width = '100%';
       showEl('audit-results');
     } catch (error) {

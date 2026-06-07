@@ -1999,6 +1999,64 @@ def _build_ads_audit(
     }
 
 
+def _audit_report_files(result: dict) -> dict:
+    headers = [
+        "Section", "ASIN", "Keyword / Target", "Campaign Name", "Ad Group Name",
+        "Match Type", "Campaign Type", "Source", "Spend", "Sales", "Clicks",
+        "Orders", "CTR", "CVR", "ACoS", "Relevance", "Confidence",
+        "Reason / Issue", "Recommended Action / Next Step",
+    ]
+    rows = []
+
+    def pct(value):
+        return "" if value is None else round(value * 100, 4)
+
+    section_map = [
+        ("Action Required", result.get("action_required", [])),
+        ("Irrelevant / Negative Candidates", result.get("irrelevant_targets", [])),
+        ("Watch List", result.get("watch_list", [])),
+        ("Performing Well", result.get("performing", [])),
+        ("Insufficient Data", result.get("insufficient", [])),
+    ]
+    for section, items in section_map:
+        for item in items:
+            rows.append([
+                section,
+                item.get("asin", ""),
+                item.get("keyword", ""),
+                item.get("campaign", ""),
+                item.get("ad_group", ""),
+                item.get("match_type", ""),
+                item.get("campaign_type", ""),
+                item.get("source", ""),
+                round(item.get("spend", 0) or 0, 2),
+                round(item.get("sales", 0) or 0, 2),
+                round(item.get("clicks", 0) or 0, 2),
+                round(item.get("orders", 0) or 0, 2),
+                pct(item.get("ctr")),
+                pct(item.get("cvr")),
+                pct(item.get("acos")),
+                item.get("relevance", ""),
+                item.get("confidence", ""),
+                item.get("reason", ""),
+                item.get("next_step", ""),
+            ])
+
+    rows.append([])
+    rows.append(["Top Recommendations"])
+    for index, recommendation in enumerate(result.get("recommendations", []), 1):
+        rows.append([index, recommendation])
+
+    rows.append([])
+    rows.append(["Data Caveats"])
+    for caveat in result.get("caveats", []):
+        rows.append(["", caveat])
+    for warning in result.get("parse_warnings", []):
+        rows.append(["", warning])
+
+    return _write_report_files("ads_audit_report", headers, rows)
+
+
 @app.post("/api/ads-performance-audit")
 async def ads_performance_audit(
     ads_files: list[UploadFile] = File(...),
@@ -2089,6 +2147,7 @@ async def ads_performance_audit(
     result["summary"]["relevance_candidate_count"] = len(relevance_candidates)
     result["summary"]["relevance_check_limit"] = AI_RELEVANCE_MAX if ai_relevance else 0
     result["parse_warnings"] = errors
+    result["ads_audit_report"] = _audit_report_files(result)
     return result
 
 
