@@ -660,6 +660,7 @@
   <div class="mode-tabs">
     <button class="mode-tab active" id="tab-single" onclick="switchMode('single')">🔍 Single ASIN</button>
     <button class="mode-tab" id="tab-bulk" onclick="switchMode('bulk')">📂 Bulk Upload</button>
+    <button class="mode-tab" id="tab-audit" onclick="switchMode('audit')">📊 Ads Audit</button>
   </div>
 
   <!-- Single ASIN mode wrapper -->
@@ -873,6 +874,96 @@
     </div>
 
   </div><!-- end mode-bulk -->
+
+  <div id="mode-audit" class="hidden">
+    <div class="card">
+      <div class="card-title">Amazon Ads Performance Audit</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">
+        Upload one full multi-tab workbook or several original Amazon Ads Excel reports. Decisions are gated by clicks, spend, and orders before performance metrics are evaluated.
+      </p>
+
+      <div class="drop-zone" id="audit-file-zone" onclick="document.getElementById('audit-file-input').click()">
+        <input type="file" id="audit-file-input" accept=".xlsx,.xlsm" multiple onchange="setAuditFiles(event)" />
+        <div class="drop-zone-icon">📊</div>
+        <h3 id="audit-file-title">Select Amazon Ads Excel report(s)</h3>
+        <p id="audit-file-sub">XLSX/XLSM · multiple files and multi-tab workbooks supported</p>
+      </div>
+
+      <div class="seo-upload-grid" style="margin-top:18px;">
+        <div>
+          <label>Reporting Period</label>
+          <input id="audit-period" type="text" placeholder="e.g. Last 30 days" />
+        </div>
+        <div>
+          <label>Campaign Type</label>
+          <select id="audit-campaign-type">
+            <option>Sponsored Products</option>
+            <option>Sponsored Brands</option>
+            <option>Sponsored Display</option>
+            <option>Mixed</option>
+          </select>
+        </div>
+        <div>
+          <label>Average Product Margin (%)</label>
+          <input id="audit-margin" type="number" min="1" max="99" step="0.1" value="30" />
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;">
+        <div>
+          <label>Business Goal</label>
+          <select id="audit-goal">
+            <option>Profitable growth</option>
+            <option>Aggressive launch</option>
+            <option>Maintain ACoS</option>
+          </select>
+        </div>
+        <div>
+          <label>New ASINs launched within 90 days</label>
+          <input id="audit-new-asins" type="text" placeholder="Comma-separated, or leave blank" />
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:18px;">
+        <button class="btn btn-primary btn-lg" id="audit-run-btn" onclick="runAdsAudit()" disabled>Run Ads Audit</button>
+        <button class="btn btn-secondary" onclick="clearAdsAudit()">Clear</button>
+      </div>
+      <div id="audit-progress" class="hidden" style="margin-top:16px;">
+        <div class="progress-bar"><div class="progress-fill" id="audit-progress-fill" style="width:0%"></div></div>
+        <div class="progress-text">Parsing reports and applying data sufficiency gates...</div>
+      </div>
+      <div id="audit-error" class="status-msg status-error hidden"></div>
+    </div>
+
+    <div id="audit-results" class="hidden">
+      <div class="card">
+        <div class="card-title" id="audit-report-title">Amazon Ads Report</div>
+        <div id="audit-warning" class="status-msg status-error hidden"></div>
+        <div id="audit-executive" style="font-size:14px;line-height:1.65;"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">🔴 Action Required</div>
+        <div id="audit-action"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">🟡 Watch List</div>
+        <div id="audit-watch"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">🟢 Performing Well</div>
+        <div id="audit-performing"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">⚪ Insufficient Data</div>
+        <div id="audit-insufficient"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📋 Top Recommendations</div>
+        <ol id="audit-recommendations" style="padding-left:20px;line-height:1.8;"></ol>
+        <div class="card-title" style="margin-top:20px;">⚠️ Data Caveats</div>
+        <ul id="audit-caveats" style="padding-left:20px;line-height:1.8;color:var(--text-muted);"></ul>
+      </div>
+    </div>
+  </div>
 
   <!-- (PPC Analysis and PPC vs Organic moved inside Bulk Upload) -->
   <div id="mode-ppc" class="hidden">
@@ -2551,12 +2642,116 @@
   let pvoMatched = [];          // [{keyword, organic_rank, page, ppc_rows[]}]
   let pvoResults = [];
   let pvoAsin = '';
+  let auditFiles = [];
 
   function switchMode(mode) {
-    ['single','bulk'].forEach(m => {
+    ['single','bulk','audit'].forEach(m => {
       document.getElementById(`mode-${m}`).classList.toggle('hidden', m !== mode);
       document.getElementById(`tab-${m}`).classList.toggle('active', m === mode);
     });
+  }
+
+  function setAuditFiles(event) {
+    auditFiles = [...event.target.files];
+    if (auditFiles.some(file => !/\.(xlsx|xlsm)$/i.test(file.name))) {
+      auditFiles = [];
+      alert('Only XLSX and XLSM Amazon Ads reports are supported.');
+      return;
+    }
+    document.getElementById('audit-file-title').textContent =
+      auditFiles.length === 1 ? auditFiles[0].name : `${auditFiles.length} reports selected`;
+    document.getElementById('audit-file-sub').textContent =
+      `${(auditFiles.reduce((sum, file) => sum + file.size, 0) / 1048576).toFixed(2)} MB total`;
+    document.getElementById('audit-run-btn').disabled = !auditFiles.length;
+  }
+
+  function clearAdsAudit() {
+    auditFiles = [];
+    document.getElementById('audit-file-input').value = '';
+    document.getElementById('audit-file-title').textContent = 'Select Amazon Ads Excel report(s)';
+    document.getElementById('audit-file-sub').textContent = 'XLSX/XLSM · multiple files and multi-tab workbooks supported';
+    document.getElementById('audit-run-btn').disabled = true;
+    hideEl('audit-results'); hideEl('audit-error');
+  }
+
+  const auditMoney = value => `$${Number(value || 0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}`;
+  const auditPct = value => value == null ? '—' : `${(Number(value) * 100).toFixed(1)}%`;
+
+  function renderAuditCards(items, kind) {
+    if (!items.length) return '<div style="color:var(--text-muted);font-size:13px;">No items in this section.</div>';
+    const groups = {};
+    items.forEach(item => (groups[item.campaign_type || 'Unspecified'] ||= []).push(item));
+    return Object.entries(groups).map(([type, group]) => `
+      <div style="font-size:12px;font-weight:800;color:var(--accent);margin:12px 0 8px;">${escHtml(type)}</div>
+      ${group.slice(0, 50).map(item => `<div class="pvo-analysis-block" style="margin-bottom:10px;">
+        <div style="font-weight:700;margin-bottom:6px;">${escHtml(item.asin)} · ${escHtml(item.keyword)} · ${escHtml(item.campaign)}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:7px;">${escHtml(item.ad_group || 'No ad group')} · ${escHtml(item.match_type)} · ${escHtml(item.source)}</div>
+        <div style="font-size:13px;line-height:1.6;">
+          <strong>Metrics:</strong> ${auditMoney(item.spend)} spend · ${auditMoney(item.sales)} revenue ·
+          ${kind === 'insufficient' ? 'ACoS suppressed · CVR suppressed' : `${auditPct(item.acos)} ACoS · ${auditPct(item.cvr)} CVR`} ·
+          ${Number(item.clicks).toFixed(0)} clicks · ${auditPct(item.ctr)} CTR<br>
+          <strong>${kind === 'watch' ? 'Signal' : kind === 'insufficient' ? 'Status' : 'Issue'}:</strong> ${escHtml(item.reason)}<br>
+          <strong>${kind === 'watch' ? 'Next Step' : kind === 'insufficient' ? 'Data Needed' : 'Recommended Action'}:</strong> ${escHtml(item.next_step)}
+        </div>
+      </div>`).join('')}
+    `).join('');
+  }
+
+  function renderAuditPerformers(items) {
+    if (!items.length) return '<div style="color:var(--text-muted);font-size:13px;">No statistically trustworthy items currently meet the performing criteria.</div>';
+    return `<div style="overflow-x:auto;"><table class="results-table"><thead><tr>
+      <th>ASIN / Keyword</th><th>Campaign Type</th><th>Spend</th><th>ACoS</th><th>CVR</th><th>Status</th>
+    </tr></thead><tbody>${items.map(item => `<tr>
+      <td><strong>${escHtml(item.asin)}</strong><br>${escHtml(item.keyword)}</td>
+      <td>${escHtml(item.campaign_type || '')}</td><td>${auditMoney(item.spend)}</td>
+      <td>${auditPct(item.acos)}</td><td>${auditPct(item.cvr)}</td><td>${escHtml(item.reason)}</td>
+    </tr>`).join('')}</tbody></table></div>`;
+  }
+
+  async function runAdsAudit() {
+    if (!auditFiles.length) return;
+    const button = document.getElementById('audit-run-btn');
+    button.disabled = true; button.innerHTML = '<span class="spinner"></span> Analyzing...';
+    showEl('audit-progress'); hideEl('audit-error'); hideEl('audit-results');
+    document.getElementById('audit-progress-fill').style.width = '65%';
+    try {
+      const form = new FormData();
+      auditFiles.forEach(file => form.append('ads_files', file));
+      form.append('reporting_period', document.getElementById('audit-period').value.trim());
+      form.append('campaign_type', document.getElementById('audit-campaign-type').value);
+      form.append('margin', document.getElementById('audit-margin').value || '30');
+      form.append('business_goal', document.getElementById('audit-goal').value);
+      form.append('new_asins', document.getElementById('audit-new-asins').value.trim());
+      const response = await fetchWithTimeout(`${API_BASE}/api/ads-performance-audit`, {method:'POST', body:form}, 240000);
+      const data = await readApiResponse(response, 'Ads audit failed.');
+      const s = data.summary, c = data.context, counts = s.section_counts || {};
+      document.getElementById('audit-report-title').textContent = `📊 Amazon Ads Report — ${c.reporting_period}`;
+      document.getElementById('audit-executive').innerHTML = `<strong>Executive Summary</strong><br>
+        Total spend was ${auditMoney(s.spend)} and attributed revenue was ${auditMoney(s.sales)}, producing ${auditPct(s.acos)} overall ACoS.
+        Account CVR was ${auditPct(s.cvr)} and CTR was ${auditPct(s.ctr)} across ${s.rows.toLocaleString()} structures.
+        The audit found ${counts.performing || 0} trustworthy performers, ${counts.action_required || 0} immediate issues,
+        ${counts.watch_list || 0} directional signals, and ${counts.insufficient || 0} items needing more data.
+        Break-even ACoS is ${auditPct(c.break_even_acos)} using the supplied ${c.margin}% margin.`;
+      const dayMatch = document.getElementById('audit-period').value.toLowerCase().match(/(\d+)\s*day/);
+      const warning = document.getElementById('audit-warning');
+      if (dayMatch && Number(dayMatch[1]) < 14) {
+        warning.textContent = '⚠ Reporting window is under 14 days. Treat all findings with additional caution.';
+        showEl('audit-warning');
+      } else hideEl('audit-warning');
+      document.getElementById('audit-action').innerHTML = renderAuditCards(data.action_required, 'action');
+      document.getElementById('audit-watch').innerHTML = renderAuditCards(data.watch_list, 'watch');
+      document.getElementById('audit-performing').innerHTML = renderAuditPerformers(data.performing);
+      document.getElementById('audit-insufficient').innerHTML = renderAuditCards(data.insufficient, 'insufficient');
+      document.getElementById('audit-recommendations').innerHTML = data.recommendations.map(x => `<li>${escHtml(x)}</li>`).join('');
+      document.getElementById('audit-caveats').innerHTML = [...data.caveats, ...(data.parse_warnings || [])].map(x => `<li>${escHtml(x)}</li>`).join('');
+      document.getElementById('audit-progress-fill').style.width = '100%';
+      showEl('audit-results');
+    } catch (error) {
+      document.getElementById('audit-error').textContent = '⚠ ' + error.message; showEl('audit-error');
+    } finally {
+      setTimeout(() => hideEl('audit-progress'), 400);
+      button.disabled = false; button.textContent = 'Run Ads Audit';
+    }
   }
 
   // Import organic rank data from Single ASIN tab results

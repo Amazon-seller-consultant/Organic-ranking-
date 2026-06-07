@@ -1426,6 +1426,349 @@ def _first_worksheet_rows(content: bytes) -> list[dict]:
         wb.close()
 
 
+def _audit_level(clicks: float, spend: float, orders: float) -> str:
+    if clicks < 10 or spend < 20 or orders <= 1:
+        return "INSUFFICIENT"
+    if clicks >= 30 and spend >= 50 and orders >= 5:
+        return "TRUSTWORTHY"
+    return "DIRECTIONAL"
+
+
+def _audit_metric_labels(
+    impressions: float,
+    clicks: float,
+    spend: float,
+    sales: float,
+    orders: float,
+    break_even_acos: float,
+) -> dict:
+    ctr = clicks / impressions if impressions else None
+    cvr = orders / clicks if clicks else None
+    acos = spend / sales if sales else None
+    roas = sales / spend if spend else None
+
+    if acos is None:
+        acos_label = "No attributed sales"
+    elif acos < break_even_acos * 0.5:
+        acos_label = "Highly Profitable"
+    elif acos < break_even_acos * 0.85:
+        acos_label = "Profitable"
+    elif acos <= break_even_acos:
+        acos_label = "Marginal"
+    else:
+        acos_label = "Losing Money"
+
+    if impressions < 1000 or ctr is None:
+        ctr_label = "Not evaluated (<1,000 impressions)"
+    elif ctr > 0.005:
+        ctr_label = "Strong"
+    elif ctr >= 0.003:
+        ctr_label = "Average"
+    elif ctr >= 0.001:
+        ctr_label = "Weak"
+    else:
+        ctr_label = "Critical"
+
+    if clicks < 30 or cvr is None:
+        cvr_label = "Not evaluated (<30 clicks)"
+    elif cvr > 0.15:
+        cvr_label = "Excellent"
+    elif cvr >= 0.08:
+        cvr_label = "Good"
+    elif cvr >= 0.04:
+        cvr_label = "Average"
+    else:
+        cvr_label = "Poor"
+
+    return {
+        "ctr": ctr,
+        "cvr": cvr,
+        "acos": acos,
+        "roas": roas,
+        "acos_label": acos_label,
+        "ctr_label": ctr_label,
+        "cvr_label": cvr_label,
+    }
+
+
+def _build_ads_audit(
+    sheets: dict[str, list[dict]],
+    reporting_period: str,
+    campaign_type: str,
+    margin: float,
+    business_goal: str,
+    new_asins: set[str],
+) -> dict:
+    asin_by_slot: dict[tuple[str, str], set[str]] = {}
+    for row in sheets["advertised"] + sheets["purchased"]:
+        asin = _norm_text(_row_get(row, "Advertised ASIN")).upper()
+        campaign = _norm_key(_row_get(row, "Campaign Name"))
+        ad_group = _norm_key(_row_get(row, "Ad Group Name"))
+        if asin and campaign:
+            asin_by_slot.setdefault((campaign, ad_group), set()).add(asin)
+
+    grouped: dict[tuple[str, str, str, str, str, str], dict] = {}
+    sources = [
+        ("Search Term", sheets["search_terms"]),
+        ("Targeting", sheets["targeting"]),
+    ]
+    for source, rows in sources:
+        for row in rows:
+            campaign = _norm_text(_row_get(row, "Campaign Name")) or "Unknown Campaign"
+            ad_group = _norm_text(_row_get(row, "Ad Group Name"))
+            keyword = _norm_text(_row_get(
+                row, "Customer Search Term", "Search Term", "Targeting", "Target", "Keyword"
+            ))
+            if not keyword:
+                continue
+            match_type = _norm_text(_row_get(row, "Match Type")) or "AUTO"
+            row_campaign_type = _norm_text(
+                _row_get(row, "Campaign Type", "_Detected Campaign Type")
+            ) or campaign_type
+            slot = (_norm_key(campaign), _norm_key(ad_group))
+            mapped_asins = asin_by_slot.get(slot) or set()
+            asin_labels = (
+                list(mapped_asins)
+                if len(mapped_asins) == 1
+                else [f"Multiple ASINs ({len(mapped_asins)})" if mapped_asins else "Unmapped"]
+            )
+            for asin in asin_labels:
+                key = (asin, campaign, ad_group, keyword, match_type, row_campaign_type)
+                item = grouped.setdefault(key, {
+                    "asin": asin,
+                    "campaign": campaign,
+                    "ad_group": ad_group,
+                    "keyword": keyword,
+                    "match_type": match_type,
+                    "campaign_type": row_campaign_type,
+                    "source": source,
+                    "impressions": 0.0,
+                    "clicks": 0.0,
+                    "spend": 0.0,
+                    "sales": 0.0,
+                    "orders": 0.0,
+                })
+                item["impressions"] += _num(_row_get(row, "Impressions"))
+                item["clicks"] += _num(_row_get(row, "Clicks"))
+                item["spend"] += _num(_row_get(row, "Spend"))
+                item["sales"] += _num(_row_get(row, "7 Day Total Sales", "14 Day Total Sales", "Sales"))
+                item["orders"] += _num(_row_get(
+                    row, "7 Day Total Orders", "14 Day Total Orders", "Orders"
+                ))
+
+    if not grouped:
+        raise HTTPException(
+            status_code=400,
+            detail="No Search Term or Targeting performance rows were found in the uploaded workbook(s).",
+        )
+
+    rows = list(grouped.values())
+    totals = {
+        metric: sum(row[metric] for row in rows)
+        for metric in ("impressions", "clicks", "spend", "sales", "orders")
+    }
+    account_ctr = totals["clicks"] / totals["impressions"] if totals["impressions"] else 0
+    account_cvr = totals["orders"] / totals["clicks"] if totals["clicks"] else 0
+    account_acos = totals["spend"] / totals["sales"] if totals["sales"] else None
+
+    margin_rate = min(max(margin / 100, 0.01), 0.99)
+    break_even_acos = 1 - margin_rate
+    action_required = []
+    watch_list = []
+    performing = []
+    insufficient = []
+
+    for row in rows:
+        level = _audit_level(row["clicks"], row["spend"], row["orders"])
+        threshold = break_even_acos * (1.5 if row["asin"] in new_asins else 1.0)
+        metrics = _audit_metric_labels(
+            row["impressions"], row["clicks"], row["spend"], row["sales"],
+            row["orders"], threshold,
+        )
+        item = {**row, **metrics, "data_level": level}
+        item["is_new_asin"] = row["asin"] in new_asins
+
+        if level == "INSUFFICIENT":
+            deficits = []
+            if row["clicks"] < 10:
+                deficits.append(f"{max(0, math.ceil(10 - row['clicks']))} more clicks")
+            if row["spend"] < 20:
+                deficits.append(f"${max(0, 20 - row['spend']):.2f} more spend")
+            if row["orders"] <= 1:
+                deficits.append(f"{max(0, math.ceil(2 - row['orders']))} more orders")
+            item["reason"] = "Needs more data; CVR, ACoS, and ROAS are suppressed."
+            item["next_step"] = "Collect " + ", ".join(deficits) + " before evaluating."
+            if row["orders"] == 0 and row["clicks"] >= 10:
+                item["next_step"] += " Zero-order traffic is a potential negative candidate, but the data gate prevents an automated decision."
+            insufficient.append(item)
+            continue
+
+        if level == "DIRECTIONAL":
+            item["reason"] = (
+                f"Directional signal: ACoS is {metrics['acos_label']}; "
+                f"CTR is {metrics['ctr_label']}; CVR is {metrics['cvr_label']}."
+            )
+            item["next_step"] = "Monitor for 7–14 days until all trustworthy thresholds are met."
+            watch_list.append(item)
+            continue
+
+        problems = []
+        actions = []
+        if metrics["acos"] is None or metrics["acos"] > threshold:
+            problems.append(f"ACoS exceeds the {threshold * 100:.1f}% evaluation threshold")
+            if metrics["cvr"] is not None and metrics["cvr"] < 0.04:
+                actions.append("Reduce bid by 15–25% and check listing relevance")
+            else:
+                actions.append("Reduce bid by 10–15% while preserving converting traffic")
+        if row["impressions"] >= 1000 and metrics["ctr"] is not None and metrics["ctr"] < 0.003:
+            problems.append("CTR is weak versus the 0.3% threshold")
+            actions.append("Improve main image, title, price, or targeting before increasing bids")
+        if row["clicks"] >= 30 and metrics["cvr"] is not None and metrics["cvr"] < 0.04:
+            problems.append("CVR is poor")
+            actions.append("Review product-page conversion and keyword intent")
+        if metrics["ctr"] < account_ctr * 0.7 and row["impressions"] >= 1000:
+            problems.append("CTR is materially below the account average")
+        if metrics["cvr"] < account_cvr * 0.7 and row["clicks"] >= 30:
+            problems.append("CVR is materially below the account average")
+
+        if problems:
+            item["reason"] = "; ".join(dict.fromkeys(problems))
+            item["next_step"] = "; ".join(dict.fromkeys(actions))
+            action_required.append(item)
+        else:
+            item["reason"] = (
+                f"{metrics['acos_label']}; CTR {metrics['ctr_label']}; "
+                f"CVR {metrics['cvr_label']}."
+            )
+            item["next_step"] = "Maintain current strategy."
+            performing.append(item)
+
+    action_required.sort(key=lambda x: (x["spend"], x["clicks"]), reverse=True)
+    watch_list.sort(key=lambda x: x["spend"], reverse=True)
+    performing.sort(key=lambda x: x["sales"], reverse=True)
+    insufficient.sort(key=lambda x: x["spend"], reverse=True)
+
+    recommendations = []
+    if action_required:
+        top = action_required[0]
+        recommendations.append(
+            f"Fix {top['campaign']} / {top['keyword']} first; it has the largest statistically reliable risk (${top['spend']:.2f} spend)."
+        )
+    zero_order = [x for x in insufficient if x["orders"] == 0 and x["clicks"] >= 10]
+    if zero_order:
+        recommendations.append(
+            f"Review {len(zero_order)} zero-order search terms as negative candidates once their data gate is satisfied."
+        )
+    if performing:
+        top = performing[0]
+        recommendations.append(
+            f"Protect the strongest proven structure: {top['campaign']} / {top['keyword']} (${top['sales']:.2f} sales)."
+        )
+    if watch_list:
+        recommendations.append(
+            f"Recheck {len(watch_list)} directional items after 7–14 more days; do not automate bid changes yet."
+        )
+    recommendations = recommendations[:5]
+
+    section_counts = {
+        "action_required": len(action_required),
+        "watch_list": len(watch_list),
+        "performing": len(performing),
+        "insufficient": len(insufficient),
+    }
+    return {
+        "context": {
+            "reporting_period": reporting_period or "Not provided",
+            "campaign_type": campaign_type or "Sponsored Products",
+            "margin": margin,
+            "break_even_acos": break_even_acos,
+            "business_goal": business_goal or "Profitable growth",
+            "new_asins": sorted(new_asins),
+        },
+        "summary": {
+            **totals,
+            "acos": account_acos,
+            "ctr": account_ctr,
+            "cvr": account_cvr,
+            "rows": len(rows),
+            "section_counts": section_counts,
+        },
+        "action_required": action_required[:100],
+        "watch_list": watch_list[:100],
+        "performing": performing[:100],
+        "insufficient": insufficient[:100],
+        "recommendations": recommendations,
+        "caveats": [
+            "All attributed metrics use the reporting columns supplied by Amazon.",
+            "Unmapped ASIN means no Advertised Products report row matched Campaign + Ad Group.",
+            "Mixed campaign types should be uploaded and reviewed separately when their report schemas differ.",
+            "Break-even ACoS follows the requested formula: 1 minus margin percentage.",
+        ],
+    }
+
+
+@app.post("/api/ads-performance-audit")
+async def ads_performance_audit(
+    ads_files: list[UploadFile] = File(...),
+    reporting_period: str = Form(""),
+    campaign_type: str = Form("Sponsored Products"),
+    margin: float = Form(30.0),
+    business_goal: str = Form("Profitable growth"),
+    new_asins: str = Form(""),
+):
+    if not ads_files:
+        raise HTTPException(status_code=400, detail="Upload at least one Amazon Ads workbook.")
+    if margin <= 0 or margin >= 100:
+        raise HTTPException(status_code=400, detail="Margin must be between 0 and 100.")
+
+    combined = {
+        "advertised": [],
+        "purchased": [],
+        "search_terms": [],
+        "targeting": [],
+        "placement": [],
+    }
+    errors = []
+    for uploaded in ads_files:
+        name = uploaded.filename or "workbook"
+        if not name.lower().endswith((".xlsx", ".xlsm")):
+            errors.append(f"{name}: only XLSX/XLSM is supported")
+            continue
+        try:
+            sheets = _extract_ads_report_sheets(await uploaded.read())
+            compact_name = "".join(ch for ch in name.lower() if ch.isalnum())
+            if "sponsoredproducts" in compact_name:
+                detected_type = "Sponsored Products"
+            elif "sponsoredbrands" in compact_name:
+                detected_type = "Sponsored Brands"
+            elif "sponsoreddisplay" in compact_name:
+                detected_type = "Sponsored Display"
+            else:
+                detected_type = campaign_type
+            for key, rows in sheets.items():
+                for row in rows:
+                    row["_Detected Campaign Type"] = detected_type
+                combined[key].extend(rows)
+        except Exception as exc:
+            errors.append(f"{name}: {exc}")
+
+    if not any(combined.values()):
+        raise HTTPException(
+            status_code=400,
+            detail="No usable Amazon Ads sheets were found. " + "; ".join(errors[:5]),
+        )
+    asin_set = {
+        value.strip().upper()
+        for value in new_asins.replace("\n", ",").split(",")
+        if value.strip()
+    }
+    result = _build_ads_audit(
+        combined, reporting_period, campaign_type, margin, business_goal, asin_set
+    )
+    result["parse_warnings"] = errors
+    return result
+
+
 def _parse_seo_ads_rows(targeting_content: bytes, advertised_content: bytes) -> list[dict]:
     advertised_rows = _first_worksheet_rows(advertised_content)
     targeting_rows = _first_worksheet_rows(targeting_content)
