@@ -1602,6 +1602,27 @@
     return path.startsWith('http') ? path : `${API_BASE}${path}`;
   }
 
+  function absoluteDownloadUrl(path) {
+    if (!path) return '';
+    if (path.startsWith('http')) return path;
+    const base = API_BASE || window.location.origin;
+    return `${base}${path}`;
+  }
+
+  function reportFallbackHtml(report, label) {
+    const xlsxUrl = absoluteDownloadUrl(report.xlsx_download_url || report.xlsx_url);
+    const csvUrl = absoluteDownloadUrl(report.csv_download_url || report.csv_url);
+    const paths = [report.xlsx_path, report.csv_path].filter(Boolean);
+    return `
+      <strong>${escHtml(label)} saved.</strong><br>
+      Open directly:
+      ${xlsxUrl ? `<a href="${escHtml(xlsxUrl)}" target="_blank" rel="noopener">Excel</a>` : ''}
+      ${csvUrl ? ` · <a href="${escHtml(csvUrl)}" target="_blank" rel="noopener">CSV</a>` : ''}<br>
+      ${xlsxUrl ? `<code>${escHtml(xlsxUrl)}</code><br>` : ''}
+      ${paths.length ? `Local files:<br>${paths.map(path => `<code>${escHtml(path)}</code>`).join('<br>')}` : ''}
+    `;
+  }
+
   async function runSeoGapAnalysis() {
     if (!(seoFiles.targeting && seoFiles.advertised && seoFiles.rank)) return;
     const button = document.getElementById('seo-run-btn');
@@ -1661,8 +1682,7 @@
       );
       const rankPaths = [data.rank_report.xlsx_path, data.rank_report.csv_path].filter(Boolean);
       if (rankPaths.length) {
-        document.getElementById('rank-file-paths').innerHTML =
-          `Saved locally:<br>${rankPaths.map(path => `<code>${escHtml(path)}</code>`).join('<br>')}`;
+        document.getElementById('rank-file-paths').innerHTML = reportFallbackHtml(data.rank_report, 'Rank Report');
         showEl('rank-file-paths');
       }
       document.getElementById('gap-csv-link').href = seoDownloadUrl(
@@ -1673,8 +1693,7 @@
       );
       const gapPaths = [data.seo_gap_report.xlsx_path, data.seo_gap_report.csv_path].filter(Boolean);
       if (gapPaths.length) {
-        document.getElementById('gap-file-paths').innerHTML =
-          `Saved locally:<br>${gapPaths.map(path => `<code>${escHtml(path)}</code>`).join('<br>')}`;
+        document.getElementById('gap-file-paths').innerHTML = reportFallbackHtml(data.seo_gap_report, 'SEO Gap Report');
         showEl('gap-file-paths');
       }
       showEl('seo-results-card');
@@ -2842,7 +2861,7 @@
         const localPaths = [data.ads_audit_report.xlsx_path, data.ads_audit_report.csv_path].filter(Boolean);
         if (localPaths.length) {
           document.getElementById('audit-file-paths').innerHTML =
-            `Saved locally. If your browser blocks downloads, open these files directly:<br>${localPaths.map(path => `<code>${escHtml(path)}</code>`).join('<br>')}`;
+            reportFallbackHtml(data.ads_audit_report, 'Ads Audit Report');
           showEl('audit-file-paths');
         }
       }
