@@ -2846,4 +2846,26 @@ async def download_export(filename: str):
     )
 
 
+@app.post("/api/save-to-downloads/{filename}")
+async def save_export_to_downloads(filename: str):
+    safe_name = Path(filename).name
+    if safe_name != filename or not safe_name.lower().endswith((".csv", ".xlsx")):
+        raise HTTPException(status_code=400, detail="Invalid report filename.")
+
+    export_dir = Path(__file__).parent / "static" / "exports"
+    source_path = export_dir / safe_name
+    if not source_path.is_file():
+        raise HTTPException(status_code=404, detail="Report file not found.")
+
+    downloads_dir = Path.home() / "Downloads"
+    downloads_dir.mkdir(parents=True, exist_ok=True)
+    output_path = downloads_dir / safe_name
+    output_path.write_bytes(source_path.read_bytes())
+    return {
+        "filename": safe_name,
+        "path": str(output_path),
+        "message": f"Saved to {output_path}",
+    }
+
+
 app.mount("/static", StaticFiles(directory="static"), name="static")

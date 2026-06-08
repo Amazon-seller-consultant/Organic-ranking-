@@ -1613,14 +1613,42 @@
     const xlsxUrl = absoluteDownloadUrl(report.xlsx_download_url || report.xlsx_url);
     const csvUrl = absoluteDownloadUrl(report.csv_download_url || report.csv_url);
     const paths = [report.xlsx_path, report.csv_path].filter(Boolean);
+    const xlsxButton = report.xlsx_name
+      ? `<button class="btn btn-primary" type="button" style="padding:8px 10px;font-size:12px;" onclick="saveReportToDownloads('${escHtml(report.xlsx_name)}', this)">Save Excel to Downloads</button>`
+      : '';
+    const csvButton = report.csv_name
+      ? `<button class="btn btn-secondary" type="button" style="padding:8px 10px;font-size:12px;" onclick="saveReportToDownloads('${escHtml(report.csv_name)}', this)">Save CSV to Downloads</button>`
+      : '';
     return `
       <strong>${escHtml(label)} saved.</strong><br>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;">${xlsxButton}${csvButton}</div>
       Open directly:
       ${xlsxUrl ? `<a href="${escHtml(xlsxUrl)}" target="_blank" rel="noopener">Excel</a>` : ''}
       ${csvUrl ? ` · <a href="${escHtml(csvUrl)}" target="_blank" rel="noopener">CSV</a>` : ''}<br>
       ${xlsxUrl ? `<code>${escHtml(xlsxUrl)}</code><br>` : ''}
       ${paths.length ? `Local files:<br>${paths.map(path => `<code>${escHtml(path)}</code>`).join('<br>')}` : ''}
     `;
+  }
+
+  async function saveReportToDownloads(filename, button) {
+    const original = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Saving...';
+    try {
+      const response = await fetchWithTimeout(`${API_BASE}/api/save-to-downloads/${encodeURIComponent(filename)}`, {
+        method: 'POST',
+      }, 30000);
+      const data = await readApiResponse(response, 'Could not save report.');
+      button.textContent = 'Saved';
+      const status = document.createElement('div');
+      status.style.marginTop = '6px';
+      status.innerHTML = `Saved to Downloads:<br><code>${escHtml(data.path)}</code>`;
+      button.parentElement.insertAdjacentElement('afterend', status);
+    } catch (error) {
+      button.disabled = false;
+      button.textContent = original;
+      alert(error.message);
+    }
   }
 
   async function runSeoGapAnalysis() {
