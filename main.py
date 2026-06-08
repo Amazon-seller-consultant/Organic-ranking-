@@ -6,6 +6,7 @@ import time
 import logging
 import math
 import json
+import re
 from datetime import datetime, timezone
 from uuid import uuid4
 import httpx
@@ -1067,6 +1068,36 @@ def _norm_key(value) -> str:
 def _keyword_key(value) -> str:
     text = _norm_key(value).strip(" \t\r\n\"'“”‘’,,.;:")
     return " ".join(text.split())
+
+
+def _keyword_tokens(value) -> set[str]:
+    return {
+        token
+        for token in re.findall(r"[a-z0-9]+", _keyword_key(value))
+        if len(token) > 1
+    }
+
+
+def _keyword_related(left: str, right: str) -> bool:
+    left_key = _keyword_key(left)
+    right_key = _keyword_key(right)
+    if not left_key or not right_key:
+        return False
+    if left_key == right_key:
+        return True
+
+    left_tokens = _keyword_tokens(left_key)
+    right_tokens = _keyword_tokens(right_key)
+    if not left_tokens or not right_tokens:
+        return False
+    if (left_key in right_key or right_key in left_key) and min(len(left_tokens), len(right_tokens)) >= 2:
+        return True
+    shared = left_tokens & right_tokens
+    shorter = min(len(left_tokens), len(right_tokens))
+    longer = max(len(left_tokens), len(right_tokens))
+    if len(shared) >= 2 and len(shared) / shorter >= 0.8:
+        return True
+    return len(shared) >= 3 and len(shared) / longer >= 0.6
 
 
 def _find_sheet_name(wb, *needles: str) -> Optional[str]:
@@ -2547,16 +2578,25 @@ async def seo_gap_analysis(
     }
     marketplace_by_asin = {entry["asin"]: entry["marketplace"] for entry in entries}
 
-    allowed_keys = {
-        (entry["asin"], _keyword_key(term))
-        for entry in entries
-        for term in entry["terms"]
-    }
+    allowed_terms_by_asin: dict[str, list[tuple[str, str]]] = {}
+    for entry in entries:
+        for term in entry["terms"]:
+            key = _keyword_key(term)
+            if key:
+                allowed_terms_by_asin.setdefault(entry["asin"], []).append((key, term))
+
     ads_lookup: dict[tuple[str, str], list[dict]] = {}
     for row in ads_rows:
-        key = (row["asin"], row["keyword_key"])
-        if key in allowed_keys:
-            ads_lookup.setdefault(key, []).append(row)
+        asin_terms = allowed_terms_by_asin.get(row["asin"], [])
+        if not asin_terms:
+            continue
+        exact = [item for item in asin_terms if item[0] == row["keyword_key"]]
+        related = exact or [
+            item for item in asin_terms
+            if _keyword_related(row["keyword"], item[1])
+        ]
+        for keyword_key, _label in related:
+            ads_lookup.setdefault((row["asin"], keyword_key), []).append(row)
 
     keyword_labels = {
         (item["asin"], _keyword_key(item["term"])): item["term"] for item in ranks
@@ -2564,7 +2604,7 @@ async def seo_gap_analysis(
 
     all_keys = set(keyword_labels)
     gap_headers = [
-        "ASIN", "Keyword", "Campaign Name", "Ad Group Name", "Match Type", "In Ads", "In Organic", "Organic Rank",
+        "ASIN", "Keyword", "Ads Keyword / Target", "Campaign Name", "Ad Group Name", "Match Type", "In Ads", "In Organic", "Organic Rank",
         "Live Sponsored Presence", "Live Sponsored Pages", "Bucket",
         "Impressions", "Clicks", "CTR", "CVR", "Orders", "Sales",
         "Spend", "ROAS", "Priority Score"
@@ -2605,6 +2645,7 @@ async def seo_gap_analysis(
             gap_rows.append([
                 asin,
                 keyword_labels[(asin, keyword_key)],
+                ad["keyword"] if ad else "",
                 ad["campaign"] if ad else "",
                 ad["ad_group"] if ad else "",
                 ad["match_type"] if ad else "",
