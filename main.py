@@ -1100,6 +1100,110 @@ def _keyword_related(left: str, right: str) -> bool:
     return len(shared) >= 3 and len(shared) / longer >= 0.6
 
 
+def _rank_zone(position) -> tuple[str, int]:
+    if not isinstance(position, (int, float)) or position <= 0:
+        return "Not ranked", 10
+    if position <= 16:
+        return "Top 16", 85
+    if position <= 30:
+        return "Page 1 opportunity", 95
+    if position <= 48:
+        return "Page 2 acceleration", 90
+    if position <= 80:
+        return "Weak visibility", 55
+    return "Poor visibility", 30
+
+
+def _seo_gap_decision(bucket: str, rank, ad: Optional[dict], ctr, cvr, roas, impressions) -> dict:
+    position = rank["position"] if rank and rank.get("found") else None
+    rank_label, rank_score = _rank_zone(position)
+    ctr_value = ctr or 0
+    cvr_value = cvr or 0
+    roas_value = roas or 0
+    imp_value = impressions or 0
+
+    traffic_score = min(20, math.log(imp_value + 1) * 2.2) if imp_value else 0
+    conversion_score = min(30, cvr_value * 1.4)
+    efficiency_score = min(15, roas_value * 3)
+    score = int(max(0, min(100, rank_score * 0.45 + traffic_score + conversion_score + efficiency_score)))
+
+    if bucket == "Paid Only":
+        if cvr_value >= 8 and roas_value >= 1.5:
+            score = max(score, 70)
+            return {
+                "type": "Paid Only Listing Gap",
+                "action": "Add to listing and isolate into exact campaign",
+                "priority": "High" if score >= 70 else "Medium",
+                "reason": "Ads prove buyer intent, but the ASIN is not ranking organically for this assigned keyword.",
+                "score": score,
+            }
+        return {
+            "type": "Paid Only Watch",
+            "action": "Review listing relevance before scaling",
+            "priority": "Medium",
+            "reason": "Keyword has ad traction but conversion or efficiency is not strong enough for aggressive SEO push.",
+            "score": max(score, 45),
+        }
+
+    if bucket == "Winning":
+        if position and 17 <= position <= 48 and cvr_value >= 8:
+            return {
+                "type": "Page 2 Push",
+                "action": "Increase exact bid and Top of Search support",
+                "priority": "High",
+                "reason": "Keyword converts in PPC and sits near Page 1, so PPC can support ranking acceleration.",
+                "score": max(score, 85),
+            }
+        if position and position <= 16:
+            return {
+                "type": "Winning Keyword",
+                "action": "Defend rank and maintain PPC support",
+                "priority": "High" if cvr_value >= 8 else "Medium",
+                "reason": "Keyword is both advertised and organically visible; protect the combined exposure.",
+                "score": max(score, 75),
+            }
+        return {
+            "type": "Winning Keyword",
+            "action": "Hold and monitor rank movement",
+            "priority": "Medium",
+            "reason": "Keyword exists in ads and organic search, but rank or conversion does not justify aggressive scaling yet.",
+            "score": score,
+        }
+
+    if bucket == "Organic Only":
+        if position and position <= 30:
+            return {
+                "type": "Organic Only Defense",
+                "action": "Consider exact PPC coverage to defend organic visibility",
+                "priority": "Medium",
+                "reason": "ASIN already ranks organically but has no matched ad support for this assigned keyword.",
+                "score": max(score, 65),
+            }
+        return {
+            "type": "Organic Only Expansion",
+            "action": "Test exact campaign with controlled budget",
+            "priority": "Low",
+            "reason": "Organic visibility exists, but rank is not strong enough to require immediate PPC defense.",
+            "score": score,
+        }
+
+    if rank_label in {"Page 1 opportunity", "Page 2 acceleration"}:
+        return {
+            "type": "Organic Rank Gap",
+            "action": "Add controlled exact PPC test",
+            "priority": "Medium",
+            "reason": "Keyword is assigned to the ASIN and has rank opportunity, but no matched ad row was found.",
+            "score": max(score, 55),
+        }
+    return {
+        "type": "Gap",
+        "action": "Deprioritize until relevance or demand is proven",
+        "priority": "Low",
+        "reason": "No matched ad row and no meaningful organic visibility were found for this assigned keyword.",
+        "score": score,
+    }
+
+
 def _find_sheet_name(wb, *needles: str) -> Optional[str]:
     normalized = {
         name: "".join(ch for ch in name.lower() if ch.isalnum())
@@ -2605,7 +2709,8 @@ async def seo_gap_analysis(
     all_keys = set(keyword_labels)
     gap_headers = [
         "ASIN", "Keyword", "Ads Keyword / Target", "Campaign Name", "Ad Group Name", "Match Type", "In Ads", "In Organic", "Organic Rank",
-        "Live Sponsored Presence", "Live Sponsored Pages", "Bucket",
+        "Live Sponsored Presence", "Live Sponsored Pages", "Bucket", "Opportunity Type",
+        "Recommended Action", "Priority", "Reason", "Ranking Opportunity Score",
         "Impressions", "Clicks", "CTR", "CVR", "Orders", "Sales",
         "Spend", "ROAS", "Priority Score"
     ]
@@ -2641,6 +2746,7 @@ async def seo_gap_analysis(
                 if bucket == "Paid Only" and cvr is not None and roas is not None
                 else None
             )
+            decision = _seo_gap_decision(bucket, rank, ad, ctr, cvr, roas, impressions)
 
             gap_rows.append([
                 asin,
@@ -2657,6 +2763,11 @@ async def seo_gap_analysis(
                     str(match["page"]) for match in (rank or {}).get("sponsored_matches", [])
                 ),
                 bucket,
+                decision["type"],
+                decision["action"],
+                decision["priority"],
+                decision["reason"],
+                decision["score"],
                 round(impressions, 2) if impressions is not None else "",
                 round(clicks, 2) if clicks is not None else "",
                 round(ctr, 4) if ctr is not None else "",
