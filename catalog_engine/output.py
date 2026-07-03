@@ -17,6 +17,7 @@ Nothing in this module publishes anywhere; it only writes files to out_dir.
 
 from __future__ import annotations
 
+import csv
 import html
 import json
 from collections import Counter
@@ -241,43 +242,151 @@ def _write_input_issues_json(outcomes: list[SkuOutcome], path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Bulk exports: results.csv + results.xlsx (all generated content, one row
+# per SKU, ready for review in Excel/Sheets or downstream tooling)
+# ---------------------------------------------------------------------------
+_BULK_HEADER = [
+    "sku", "product_type", "status", "skip_reason",
+    "title", "title_chars",
+    "highlight_1", "highlight_2", "highlight_3",
+    "bullet_1", "bullet_2", "bullet_3",
+    "bullet_1_chars", "bullet_2_chars", "bullet_3_chars",
+    "description", "description_chars",
+    "search_terms", "search_terms_bytes",
+    "issues", "compliance_log",
+]
+
+
+def _bulk_rows(outcomes: list[SkuOutcome]) -> list[list[Any]]:
+    rows: list[list[Any]] = []
+    for o in outcomes:
+        gen = o.generated
+        hl = list(gen.item_highlights) if gen else []
+        bl = list(gen.bullets) if gen else []
+        hl += [""] * (3 - len(hl))
+        bl += [""] * (3 - len(bl))
+        issues = "; ".join(
+            f"[{i.severity.value if isinstance(i.severity, Severity) else i.severity}] "
+            f"{i.rule} ({i.field_name}): {i.message}" for i in o.issues
+        )
+        clog = "; ".join(f"[{e.category}] {e.reason}" for e in o.compliance_log)
+        rows.append([
+            o.record.sku, o.record.product_type, o.status, o.skip_reason,
+            gen.title if gen else "", _chars(gen.title) if gen else 0,
+            hl[0], hl[1], hl[2],
+            bl[0], bl[1], bl[2],
+            _chars(bl[0]), _chars(bl[1]), _chars(bl[2]),
+            gen.description if gen else "",
+            _chars(gen.description) if gen else 0,
+            gen.search_terms if gen else "",
+            _bytes_utf8(gen.search_terms) if gen else 0,
+            issues, clog,
+        ])
+    return rows
+
+
+def _write_results_csv(outcomes: list[SkuOutcome], path: Path) -> None:
+    with path.open("w", newline="", encoding="utf-8-sig") as f:  # BOM: Excel-safe
+        writer = csv.writer(f)
+        writer.writerow(_BULK_HEADER)
+        writer.writerows(_bulk_rows(outcomes))
+
+
+def _write_results_xlsx(outcomes: list[SkuOutcome], run_id: str, path: Path) -> None:
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Results"
+    header_font = openpyxl.styles.Font(bold=True)
+    ws.append(_BULK_HEADER)
+    for cell in ws[1]:
+        cell.font = header_font
+    for row in _bulk_rows(outcomes):
+        ws.append(row)
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = ws.dimensions
+    # readable default widths for the long-text columns
+    widths = {"A": 22, "B": 18, "C": 13, "E": 60, "G": 40, "H": 40, "I": 40,
+              "J": 50, "K": 50, "L": 50, "P": 70, "R": 50, "T": 60, "U": 60}
+    for col, w in widths.items():
+        ws.column_dimensions[col].width = w
+    wb.save(path)
+
+
+# ---------------------------------------------------------------------------
 # report.html
 # ---------------------------------------------------------------------------
+# "Aurora glass" theme: dark violet gradient canvas, frosted translucent
+# cards (backdrop blur), glowing status pills. Print falls back gracefully.
 _CSS = """
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
 body { font-family: -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
-       margin: 24px; color: #1f2937; background: #f9fafb; }
-h1 { font-size: 20px; margin: 0 0 4px; }
-.meta { color: #6b7280; font-size: 13px; margin-bottom: 8px; }
-.counts span { display: inline-block; margin-right: 10px; padding: 2px 10px;
-               border-radius: 10px; font-size: 12px; background: #e5e7eb; }
-.card { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
-        padding: 16px; margin: 16px 0; page-break-inside: avoid; }
-.card h2 { font-size: 16px; margin: 0 0 2px; }
-.pt { color: #6b7280; font-size: 12px; margin-bottom: 8px; }
-.badge { display: inline-block; padding: 1px 8px; border-radius: 9px;
-         font-size: 11px; font-weight: 600; color: #fff; vertical-align: middle; }
-.badge.ok { background: #16a34a; }
-.badge.needs_review { background: #d97706; }
-.badge.other { background: #6b7280; }
-.badge.error { background: #dc2626; }
-.badge.warning { background: #d97706; }
-.badge.info { background: #6b7280; }
-table.ba { border-collapse: collapse; width: 100%; margin: 8px 0; }
-table.ba th, table.ba td { border: 1px solid #e5e7eb; padding: 6px 8px;
-                           font-size: 13px; text-align: left;
-                           vertical-align: top; word-break: break-word; }
-table.ba th { background: #f3f4f6; }
-table.ba td.field { white-space: nowrap; font-weight: 600; width: 110px; }
-.count { color: #6b7280; font-size: 11px; white-space: nowrap; }
-.count.over { color: #dc2626; font-weight: 600; }
-.hl-note { color: #b45309; font-size: 12px; margin: 2px 0 4px; }
+       margin: 0; padding: 32px 24px; color: rgba(255,255,255,.88);
+       min-height: 100vh;
+       background: linear-gradient(135deg,#0f0c29 0%,#302b63 55%,#24243e 100%)
+                   fixed; }
+h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; color: #fff;
+     letter-spacing: .2px; }
+.meta { color: rgba(255,255,255,.55); font-size: 13px; margin-bottom: 12px; }
+.counts span { display: inline-block; margin: 0 8px 8px 0; padding: 4px 14px;
+               border-radius: 999px; font-size: 12px; font-weight: 600;
+               background: rgba(255,255,255,.08);
+               border: 1px solid rgba(255,255,255,.16);
+               backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.counts span.s-ok { background: rgba(52,211,153,.14);
+                    border-color: rgba(52,211,153,.4); color: #6ee7b7; }
+.counts span.s-needs_review { background: rgba(251,191,36,.14);
+                    border-color: rgba(251,191,36,.4); color: #fcd34d; }
+.counts span.s-failed { background: rgba(248,113,113,.14);
+                    border-color: rgba(248,113,113,.4); color: #fca5a5; }
+.card { background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14);
+        border-radius: 16px; padding: 18px 20px; margin: 18px 0;
+        backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+        box-shadow: 0 8px 32px rgba(3,0,26,.35); page-break-inside: avoid; }
+.card h2 { font-size: 16px; font-weight: 600; margin: 0 0 2px; color: #fff; }
+.pt { color: rgba(255,255,255,.5); font-size: 12px; margin-bottom: 10px;
+      letter-spacing: .4px; }
+.badge { display: inline-block; padding: 2px 10px; border-radius: 999px;
+         font-size: 11px; font-weight: 600; vertical-align: middle; }
+.badge.ok { background: linear-gradient(90deg,#34d399,#22d3ee); color: #052e2b; }
+.badge.needs_review { background: linear-gradient(90deg,#fbbf24,#fb923c);
+                      color: #451a03; }
+.badge.other { background: rgba(255,255,255,.14); color: rgba(255,255,255,.75); }
+.badge.error { background: rgba(248,113,113,.18); color: #fca5a5;
+               border: 1px solid rgba(248,113,113,.45); }
+.badge.warning { background: rgba(251,191,36,.16); color: #fcd34d;
+                 border: 1px solid rgba(251,191,36,.4); }
+.badge.info { background: rgba(255,255,255,.1); color: rgba(255,255,255,.65);
+              border: 1px solid rgba(255,255,255,.18); }
+table.ba { border-collapse: separate; border-spacing: 0; width: 100%;
+           margin: 8px 0; border-radius: 10px; overflow: hidden;
+           border: 1px solid rgba(255,255,255,.12); }
+table.ba th, table.ba td { padding: 8px 10px; font-size: 13px; text-align: left;
+           vertical-align: top; word-break: break-word;
+           border-bottom: 1px solid rgba(255,255,255,.08); }
+table.ba tr:last-child td { border-bottom: none; }
+table.ba th { background: rgba(255,255,255,.08); color: rgba(255,255,255,.75);
+              font-weight: 600; font-size: 12px; }
+table.ba td { background: rgba(255,255,255,.03); color: rgba(255,255,255,.82); }
+table.ba td.field { white-space: nowrap; font-weight: 600; width: 110px;
+                    color: #a5b4fc; }
+.count { color: rgba(255,255,255,.45); font-size: 11px; white-space: nowrap; }
+.count.over { color: #fca5a5; font-weight: 700; }
+.hl-note { color: #fcd34d; font-size: 12px; margin: 2px 0 4px; }
 ul.issues, ul.hl, ul.clog { margin: 4px 0 0; padding-left: 18px; }
-ul.issues li, ul.clog li { font-size: 13px; margin: 3px 0; }
-ul.hl li { font-size: 13px; margin: 2px 0; }
+ul.issues li, ul.clog li { font-size: 13px; margin: 4px 0;
+                           color: rgba(255,255,255,.78); }
+ul.hl li { font-size: 13px; margin: 3px 0; color: rgba(255,255,255,.85); }
 .rule { font-family: ui-monospace, Menlo, monospace; font-size: 12px;
-        color: #374151; }
-h3 { font-size: 13px; margin: 12px 0 2px; }
-.empty { color: #9ca3af; font-style: italic; }
+        color: #93c5fd; }
+h3 { font-size: 13px; font-weight: 600; margin: 14px 0 4px;
+     color: rgba(255,255,255,.65); letter-spacing: .5px;
+     text-transform: uppercase; }
+.empty { color: rgba(255,255,255,.3); font-style: italic; }
+@media print {
+  body { background: #fff; color: #111; }
+  .card { background: #fff; border-color: #ddd; box-shadow: none; }
+}
 """
 
 
@@ -402,7 +511,8 @@ def _write_report_html(
 ) -> None:
     counts = Counter(o.status for o in outcomes)
     counts_html = "".join(
-        f"<span>{_esc(status)}: {n}</span>" for status, n in sorted(counts.items())
+        f'<span class="s-{_esc(status)}">{_esc(status)}: {n}</span>'
+        for status, n in sorted(counts.items())
     )
     ordered = sorted(
         outcomes, key=lambda o: (_STATUS_ORDER.get(o.status, 2), o.record.sku)
@@ -449,15 +559,23 @@ def write_outputs(
     results_path = out_dir / "results.json"
     report_path = out_dir / "report.html"
     input_issues_path = out_dir / "input_issues.json"
+    csv_path = out_dir / "results.csv"
+    xlsx_path = out_dir / "results.xlsx"
+
+    reviewable = [o for o in outcomes if o.status in ("ok", "needs_review", "failed")]
 
     _write_upload_xlsx(parse, ok_outcomes, upload_path)
     _write_results_json(parse, outcomes, run_id, results_path)
     _write_report_html(parse, outcomes, run_id, report_path)
     _write_input_issues_json(outcomes, input_issues_path)
+    _write_results_csv(reviewable, csv_path)
+    _write_results_xlsx(reviewable, run_id, xlsx_path)
 
     return {
         "upload.xlsx": str(upload_path),
         "results.json": str(results_path),
+        "results.csv": str(csv_path),
+        "results.xlsx": str(xlsx_path),
         "report.html": str(report_path),
         "input_issues.json": str(input_issues_path),
     }

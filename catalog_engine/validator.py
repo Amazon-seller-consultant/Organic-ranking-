@@ -20,6 +20,7 @@ limits > keyword retention):
 from __future__ import annotations
 
 import dataclasses
+import html as html_mod
 import re
 import unicodedata
 from typing import List, Optional, Tuple
@@ -47,6 +48,19 @@ from .models import (
 # Fraction of the original field that must survive a compliance excision;
 # below this we keep the original text and flag for human review instead.
 GUT_THRESHOLD = 0.30
+
+# Minimum fill targets: content below these leaves indexable space unused.
+# INFO-level findings only — short-but-accurate copy is never blocked.
+UTILIZATION_FLOORS = {
+    "title": 60,          # of 75 chars
+    "highlight": 90,      # of 125 chars
+    "bullet": 95,         # of 125 chars
+    "description": 1400,  # of 2000 chars
+}
+SEARCH_TERMS_FLOOR_BYTES = 200  # of 249 bytes
+
+_HTML_TAG_RE = re.compile(r"</?[a-zA-Z][^>]*/?>|<!--.*?-->", re.DOTALL)
+_HTML_ENTITY_RE = re.compile(r"&(?:[a-zA-Z]{2,10}|#\d{1,7}|#x[0-9a-fA-F]{1,6});")
 
 # ---------------------------------------------------------------------------
 # Hallucination-check vocabularies (deterministic, no LLM)
@@ -181,6 +195,57 @@ def _tidy(s: str) -> str:
 
 def _overlaps(span: Tuple[int, int], claimed: List[Tuple[int, int]]) -> bool:
     return any(s < span[1] and span[0] < e for s, e in claimed)
+
+
+# ---------------------------------------------------------------------------
+# Check 0: HTML stripping (Amazon rejects/renders-broken HTML in all fields)
+# ---------------------------------------------------------------------------
+def _strip_html_field(
+    record: ProductRecord,
+    field_name: str,
+    text: str,
+    issues: List[Issue],
+) -> str:
+    """Remove HTML tags and decode entities. Deterministic guarantee that no
+    markup ships in any field, whatever the LLM produced."""
+    if not text:
+        return text
+    cleaned = _HTML_TAG_RE.sub(" ", text)
+    if _HTML_ENTITY_RE.search(cleaned):
+        cleaned = html_mod.unescape(cleaned)
+    if cleaned != text:
+        cleaned = _tidy(cleaned)
+        issues.append(Issue(
+            sku=record.sku, field_name=field_name, rule="html_stripped",
+            severity=Severity.INFO,
+            message="HTML markup/entities removed from %s — Amazon fields "
+                    "must be plain text" % field_name,
+            action="removed", before=text, after=cleaned,
+        ))
+    return cleaned
+
+
+# ---------------------------------------------------------------------------
+# Check 5: limit utilization (INFO) — unused chars are unused SEO space
+# ---------------------------------------------------------------------------
+def _check_utilization(
+    record: ProductRecord,
+    field_name: str,
+    text: str,
+    floor: int,
+    limit: int,
+    issues: List[Issue],
+    unit: str = "chars",
+) -> None:
+    n = byte_len_utf8(text) if unit == "bytes" else char_len(text)
+    if text and n < floor:
+        issues.append(Issue(
+            sku=record.sku, field_name=field_name, rule="underutilized_limit",
+            severity=Severity.INFO,
+            message="%s uses %d of %d %s — %d %s of indexable space unused"
+                    % (field_name, n, limit, unit, limit - n, unit),
+            action="none", before=text, after=text,
+        ))
 
 
 # ---------------------------------------------------------------------------
@@ -401,6 +466,18 @@ def verify_generated(
     description = gen.description or ""
     search_terms = gen.search_terms or ""
 
+    # -- 0. HTML stripping (plain text guarantee) ------------------------
+    def strip_html(field_name: str, text: str) -> str:
+        return _strip_html_field(record, field_name, text, issues)
+
+    title = strip_html("title", title)
+    highlights = [strip_html("highlight_%d" % (i + 1), h)
+                  for i, h in enumerate(highlights)]
+    bullets = [strip_html("bullet_%d" % (i + 1), b)
+               for i, b in enumerate(bullets)]
+    description = strip_html("description", description)
+    search_terms = strip_html("search_terms", search_terms)
+
     # -- 1. compliance-language scan -----------------------------------
     def scan(field_name: str, text: str) -> str:
         return _scan_compliance_field(
@@ -557,6 +634,23 @@ def verify_generated(
                        "limit (on_limit_violation=flag)"
                        % (n_bytes, SEARCH_TERMS_MAX_BYTES),
             ))
+
+    # -- 5. limit utilization (INFO only — unused space = unused SEO) ----
+    _check_utilization(record, "title", title,
+                       UTILIZATION_FLOORS["title"], TITLE_MAX_CHARS, issues)
+    for i, h in enumerate(highlights):
+        _check_utilization(record, "highlight_%d" % (i + 1), h,
+                           UTILIZATION_FLOORS["highlight"], HIGHLIGHT_MAX_CHARS,
+                           issues)
+    for i, b in enumerate(bullets):
+        _check_utilization(record, "bullet_%d" % (i + 1), b,
+                           UTILIZATION_FLOORS["bullet"], BULLET_MAX_CHARS, issues)
+    _check_utilization(record, "description", description,
+                       UTILIZATION_FLOORS["description"], DESCRIPTION_MAX_CHARS,
+                       issues)
+    _check_utilization(record, "search_terms", search_terms,
+                       SEARCH_TERMS_FLOOR_BYTES, SEARCH_TERMS_MAX_BYTES,
+                       issues, unit="bytes")
 
     new_gen = dataclasses.replace(
         gen,

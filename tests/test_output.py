@@ -132,7 +132,8 @@ def _col(parse, base: str, instance: int = 1):
 
 def test_returns_all_artifacts(artifacts):
     assert set(artifacts) == {
-        "upload.xlsx", "results.json", "report.html", "input_issues.json"
+        "upload.xlsx", "results.json", "results.csv", "results.xlsx",
+        "report.html", "input_issues.json",
     }
     for path in artifacts.values():
         assert Path(path).exists()
