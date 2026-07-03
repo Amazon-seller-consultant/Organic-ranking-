@@ -401,3 +401,43 @@ class TestNoMutation:
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-q"]))
+
+
+def test_attested_claim_allowed_and_logged():
+    from catalog_engine.models import (GeneratedContent, ProductRecord,
+                                       Parentage, RecordAction, SellerConfig,
+                                       Severity)
+    from catalog_engine.validator import verify_generated
+    rec = ProductRecord(
+        seller_id="s1", sku="SKU1", row_number=7, product_type="SIGNAGE",
+        record_action=RecordAction.PARTIAL_UPDATE, listing_status="Active",
+        parentage=Parentage.STANDALONE, parent_sku=None, variation_theme=None,
+        attributes={"item_name": ["Sign Holder 8.5 x 11 Inch"],
+                    "brand": ["Acme"]},
+    )
+    gen = GeneratedContent(
+        sku="SKU1", title="Acme Clear Sign Holder 8.5 x 11 Inch Display",
+        item_highlights=["Clear acrylic front panel for glare-free viewing",
+                         "Holds standard 8.5 x 11 inch inserts",
+                         "Slide-in loading for fast sign changes"],
+        bullets=["Clear front panel protects inserts",
+                 "Fits standard 8.5 x 11 inch signs",
+                 "Slide-in design for quick updates"],
+        description="A clear sign holder for 8.5 x 11 inch inserts.",
+        search_terms="sign holder display insert frame stand",
+    )
+    cfg_no = SellerConfig(seller_id="s1")
+    _, issues_no, _ = verify_generated(rec, gen, cfg_no, "run1")
+    assert any(i.rule == "unsupported_claim" and "clear" in i.message.lower()
+               for i in issues_no), "without attestation 'clear' must flag"
+
+    cfg_yes = SellerConfig(
+        seller_id="s1",
+        attested_terms={"clear": "all signage products are clear acrylic"})
+    _, issues_yes, log_yes = verify_generated(rec, gen, cfg_yes, "run1")
+    assert not any(i.rule == "unsupported_claim" and "clear" in i.message.lower()
+                   for i in issues_yes), "attested 'clear' must not flag"
+    att = [i for i in issues_yes if i.rule == "attested_claim"]
+    assert att and att[0].severity is Severity.INFO
+    assert any(e.category == "attested" and "attestation" in e.reason
+               for e in log_yes), "attestation must land in the audit log"

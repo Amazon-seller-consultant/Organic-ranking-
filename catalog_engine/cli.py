@@ -36,6 +36,14 @@ def main(argv: list[str] | None = None) -> int:
     sc.add_argument("--on-limit", default="auto_trim", choices=["auto_trim", "flag"])
     sc.add_argument("--brand-voice", default="")
     sc.add_argument("--model", default="claude-opus-4-8")
+    sa = ssub.add_parser("attest", help="attest a fact term for a seller")
+    sa.add_argument("--seller", required=True)
+    sa.add_argument("--term", required=True,
+                    help="the word/phrase being attested, e.g. 'clear'")
+    sa.add_argument("--note", required=True,
+                    help="the attestation, e.g. 'signage products are clear acrylic'")
+    sa.add_argument("--remove", action="store_true",
+                    help="withdraw the attestation for --term instead")
 
     rp = sub.add_parser("run", help="run the pipeline on a flat file")
     rp.add_argument("--seller", required=True)
@@ -56,7 +64,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     store = Store(args.data_dir)
     try:
-        if args.cmd == "seller":
+        if args.cmd == "seller" and args.seller_cmd == "create":
             store.upsert_seller(SellerConfig(
                 seller_id=args.seller, display_name=args.name,
                 marketplace=args.marketplace, on_limit_violation=args.on_limit,
@@ -64,6 +72,17 @@ def main(argv: list[str] | None = None) -> int:
             ))
             print(f"seller '{args.seller}' saved "
                   f"(marketplace={args.marketplace}, on_limit={args.on_limit})")
+        elif args.cmd == "seller" and args.seller_cmd == "attest":
+            cfg = store.get_seller(args.seller)
+            if args.remove:
+                cfg.attested_terms.pop(args.term.lower(), None)
+                print(f"attestation for '{args.term}' withdrawn")
+            else:
+                cfg.attested_terms[args.term.lower()] = args.note
+                print(f"attested '{args.term}': {args.note}")
+            store.upsert_seller(cfg)
+            print(f"seller '{args.seller}' now has "
+                  f"{len(cfg.attested_terms)} attested term(s)")
         elif args.cmd == "run":
             from .pipeline import run_pipeline
             s = run_pipeline(

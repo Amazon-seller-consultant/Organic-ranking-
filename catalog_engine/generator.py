@@ -211,9 +211,17 @@ def generate_for_record(
     store: Optional[Store] = None,
 ) -> GeneratedContent:
     snapshot = build_source_snapshot(record)
+    attested_block = ""
+    if config.attested_terms:
+        attested_block = (
+            "\n\nSELLER-ATTESTED FACTS (confirmed by the seller in writing; "
+            "usable exactly like source data):\n"
+            + "\n".join(f"- {t}: {note}" for t, note in config.attested_terms.items())
+        )
     user_msg = (
         "SOURCE DATA (the only permissible facts):\n"
         + json.dumps(snapshot, ensure_ascii=False, indent=1, sort_keys=False)
+        + attested_block
         + "\n\nWrite the optimized listing content for this product."
     )
 

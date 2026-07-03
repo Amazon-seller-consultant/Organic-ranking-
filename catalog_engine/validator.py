@@ -334,9 +334,11 @@ def _check_claims_field(
     run_id: str,
     issues: List[Issue],
     log: List[ComplianceLogEntry],
+    attested: Optional[dict] = None,  # normalized term -> attestation note
 ) -> None:
     if not text:
         return
+    attested = attested or {}
     flagged: set = set()  # normalized claim -> flag once per field
     claimed_spans: List[Tuple[int, int]] = []
 
@@ -345,6 +347,24 @@ def _check_claims_field(
         if key in flagged:
             return
         flagged.add(key)
+        note = attested.get(_normalize_words(phrase))
+        if note is not None:
+            # Seller has attested this term: allowed, but leave an audit
+            # record so the acceptance is traceable to the attestation.
+            issues.append(Issue(
+                sku=record.sku, field_name=field_name, rule="attested_claim",
+                severity=Severity.INFO,
+                message="%s claim '%s' accepted per seller attestation: %s"
+                        % (kind, phrase, note),
+                action="none", before=text, after=text,
+            ))
+            log.append(ComplianceLogEntry(
+                seller_id=record.seller_id, run_id=run_id, sku=record.sku,
+                field_name=field_name, category="attested", removed_text="",
+                reason="allowed '%s' in %s — seller attestation: %s"
+                       % (phrase, field_name, note),
+            ))
+            return
         issues.append(Issue(
             sku=record.sku, field_name=field_name, rule="unsupported_claim",
             severity=Severity.ERROR,
@@ -490,13 +510,18 @@ def verify_generated(
     search_terms = scan("search_terms", search_terms)
 
     # -- 2. attribute-diff hallucination check (flags only) ------------
+    attested = {
+        _normalize_words(term): note
+        for term, note in (config.attested_terms or {}).items()
+    }
     claim_fields = [("title", title)]
     claim_fields += [("highlight_%d" % (i + 1), h) for i, h in enumerate(highlights)]
     claim_fields += [("bullet_%d" % (i + 1), b) for i, b in enumerate(bullets)]
     claim_fields.append(("description", description))
     for field_name, text in claim_fields:
         _check_claims_field(
-            record, field_name, text, haystack_norm, numbers, run_id, issues, log)
+            record, field_name, text, haystack_norm, numbers, run_id, issues,
+            log, attested=attested)
 
     # -- 3. limits (after removals) -------------------------------------
     title = _enforce_char_limit(

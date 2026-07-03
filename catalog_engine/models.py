@@ -154,6 +154,12 @@ class SellerConfig:
     on_limit_violation: str = "auto_trim"  # or "flag"
     brand_voice: str = ""  # free-text tone guidance for generation
     generation_model: str = "claude-opus-4-8"
+    # Seller-attested vocabulary: term -> the seller's attestation note.
+    # These are facts the SELLER has confirmed (e.g. "clear": "signage
+    # products are clear acrylic"). The validator accepts them like source
+    # data and records the attestation in the audit log. They are seller
+    # input, never model inference.
+    attested_terms: dict[str, str] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
