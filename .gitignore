@@ -8,3 +8,4 @@ package-lock.json
 static/exports/
 .DS_Store
 data/
+outputs/
