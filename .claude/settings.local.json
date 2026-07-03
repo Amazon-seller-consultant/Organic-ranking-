@@ -20,7 +20,15 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8000/api/template.csv)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8000/static/asin_rank_template.xlsx)",
       "Bash(git init *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git config *)",
+      "Bash(git commit *)",
+      "Bash(curl -s -X POST http://localhost:8000/api/ppc-analyze -H 'Content-Type: application/json' -d '{ *)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(r['keyword'],'-',r['priority'],'-',r['recommended_action'][:80]\\) for r in d['results']]\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(r['keyword'][:40],'-',r['priority']\\) for r in d['results']]\")",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/api/ppc-vs-organic -X POST -H 'Content-Type: application/json' -d '{\"asin\":\"B08N5WRWNW\",\"target_acos\":25,\"keywords\":[{\"keyword\":\"sandwich boards\",\"organic_rank\":15,\"ppc_rows\":[{\"match_type\":\"Keyword - exact\",\"campaign\":\"SP-Exact\",\"impressions\":18000,\"clicks\":420,\"ctr\":0.0233,\"cpc\":1.85,\"spend\":777,\"orders\":38,\"sales\":4180,\"cvr\":9.05,\"acos\":0.186,\"roas\":5.38,\"top_of_search_is\":42.0},{\"match_type\":\"Keyword - broad\",\"campaign\":\"SP-Broad\",\"impressions\":95000,\"clicks\":490,\"ctr\":0.00516,\"cpc\":1.2,\"spend\":588,\"orders\":12,\"sales\":1320,\"cvr\":2.45,\"acos\":0.446,\"roas\":2.24,\"top_of_search_is\":null}]}]}')",
+      "Read(//Users/denizolmez/Downloads/**)",
+      "Bash(awk -F',' '{print NF}')"
     ]
   }
 }
