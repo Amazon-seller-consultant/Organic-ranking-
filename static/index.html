@@ -642,6 +642,52 @@
       border: none; border-top: 1px solid var(--border); margin: 20px 0;
     }
     label { font-size: 13px; color: var(--text-muted); display: block; margin-bottom: 6px; }
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      resize: vertical;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 11px 14px;
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.5;
+      outline: none;
+      font-family: inherit;
+    }
+    textarea:focus { border-color: var(--accent); }
+    textarea::placeholder { color: var(--text-muted); }
+    input[type="number"] {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 11px 14px;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+    }
+    input[type="number"]:focus { border-color: var(--accent); }
+    .optimizer-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 760px) {
+      .optimizer-grid { grid-template-columns: 1fr; }
+    }
+    .output-box {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      font-size: 13px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+    .validation-pass { color: var(--success); }
+    .validation-warn { color: var(--warn); }
+    .validation-fail { color: var(--danger); }
   </style>
 </head>
 <body>
@@ -661,6 +707,7 @@
     <button class="mode-tab active" id="tab-single" onclick="switchMode('single')">🔍 Single ASIN</button>
     <button class="mode-tab" id="tab-bulk" onclick="switchMode('bulk')">📂 Bulk Upload</button>
     <button class="mode-tab" id="tab-audit" onclick="switchMode('audit')">📊 Ads Audit</button>
+    <button class="mode-tab" id="tab-listing" onclick="switchMode('listing')">✍️ Listing Optimizer</button>
   </div>
 
   <!-- Single ASIN mode wrapper -->
@@ -984,6 +1031,120 @@
         <ol id="audit-recommendations" style="padding-left:20px;line-height:1.8;"></ol>
         <div class="card-title" style="margin-top:20px;">⚠️ Data Caveats</div>
         <ul id="audit-caveats" style="padding-left:20px;line-height:1.8;color:var(--text-muted);"></ul>
+      </div>
+    </div>
+  </div>
+
+  <div id="mode-listing" class="hidden">
+    <div class="card">
+      <div class="card-title">Data-Layered Amazon Listing Optimizer</div>
+      <div style="font-size:13px;color:var(--text-muted);line-height:1.6;margin-bottom:18px;">
+        Paste SQP, PPC, review, and filter/spec context. The optimizer scores the terms, builds a 75-character title brief, and rewrites the visible and backend fields around buyer evidence.
+      </div>
+
+      <div class="optimizer-grid">
+        <div>
+          <label>ASIN</label>
+          <input type="text" id="lo-asin" placeholder="Optional" />
+        </div>
+        <div>
+          <label>Brand</label>
+          <input type="text" id="lo-brand" placeholder="e.g. Cataloops" />
+        </div>
+        <div>
+          <label>Product Type</label>
+          <input type="text" id="lo-product-type" placeholder="e.g. above ground pool" />
+        </div>
+        <div>
+          <label>Title Limit</label>
+          <input type="number" id="lo-title-limit" min="40" max="200" value="75" style="width:100%;" />
+        </div>
+      </div>
+
+      <div style="margin-top:14px;">
+        <label>Current Title</label>
+        <input type="text" id="lo-current-title" placeholder="Paste the current Amazon title" />
+      </div>
+      <div style="margin-top:14px;">
+        <label>Product Specs / Included Components</label>
+        <textarea id="lo-specs" placeholder="Example: 10 ft x 30 in pool, filter pump included, canopy included, steel frame, above-ground setup..."></textarea>
+      </div>
+
+      <div class="optimizer-grid" style="margin-top:14px;">
+        <div>
+          <label>SQP Export Rows</label>
+          <textarea id="lo-sqp" placeholder="CSV columns like: Search Query, Impressions, Clicks, Cart Adds, Purchases"></textarea>
+        </div>
+        <div>
+          <label>PPC Rows</label>
+          <textarea id="lo-ppc" placeholder="CSV columns like: Keyword, Impressions, Clicks, Spend, Orders, Sales, CVR, ACoS"></textarea>
+        </div>
+        <div>
+          <label>Review Language</label>
+          <textarea id="lo-reviews" placeholder="Paste phrases buyers repeat in reviews, one per line or comma-separated."></textarea>
+        </div>
+        <div>
+          <label>Filter / Browse-Relevant Specs</label>
+          <textarea id="lo-filters" placeholder="Example: above ground, filter pump, canopy, steel frame, family size, 10 ft"></textarea>
+        </div>
+      </div>
+
+      <div class="optimizer-grid" style="margin-top:14px;">
+        <div>
+          <label>Must Include Terms</label>
+          <input type="text" id="lo-must" placeholder="Comma-separated" />
+        </div>
+        <div>
+          <label>Avoid Terms</label>
+          <input type="text" id="lo-avoid" placeholder="Comma-separated" />
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:18px;align-items:center;flex-wrap:wrap;">
+        <button class="btn btn-ai btn-lg" id="lo-run-btn" onclick="runListingOptimizer()">Optimize Listing</button>
+        <button class="btn btn-secondary" onclick="fillListingExample()">Load Example</button>
+        <button class="btn btn-secondary" onclick="clearListingOptimizer()">Clear</button>
+      </div>
+      <div id="lo-progress" class="hidden" style="margin-top:16px;">
+        <div class="progress-bar"><div class="progress-fill" style="width:75%"></div></div>
+        <div class="progress-text">Scoring buyer signals and rewriting fields...</div>
+      </div>
+      <div id="lo-error" class="status-msg status-error hidden"></div>
+    </div>
+
+    <div class="card hidden" id="lo-results-card">
+      <div class="card-title">Optimized Listing Fields</div>
+      <div class="summary-bar" id="lo-summary-bar"></div>
+      <div class="optimizer-grid">
+        <div>
+          <div class="section-label label-action">Title</div>
+          <div class="output-box" id="lo-title-output"></div>
+        </div>
+        <div>
+          <div class="section-label label-diagnosis">Validation</div>
+          <div class="output-box" id="lo-validation-output"></div>
+        </div>
+        <div>
+          <div class="section-label label-conversion">Item Highlights</div>
+          <div class="output-box" id="lo-highlights-output"></div>
+        </div>
+        <div>
+          <div class="section-label label-organic">Backend Keywords</div>
+          <div class="output-box" id="lo-backend-output"></div>
+        </div>
+      </div>
+      <div style="margin-top:14px;">
+        <div class="section-label label-traffic">Bullets</div>
+        <div class="output-box" id="lo-bullets-output"></div>
+      </div>
+      <div style="margin-top:18px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+        <button class="btn btn-secondary" onclick="exportListingCSV()">Export Scored Terms CSV</button>
+      </div>
+      <div style="overflow-x:auto;margin-top:12px;">
+        <table class="results-table">
+          <thead><tr><th>Term</th><th>Score</th><th>SQP</th><th>PPC</th><th>Review</th><th>Filter</th><th>Evidence</th></tr></thead>
+          <tbody id="lo-terms-body"></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -2751,7 +2912,7 @@
   let auditRankFile = null;
 
   function switchMode(mode) {
-    ['single','bulk','audit'].forEach(m => {
+    ['single','bulk','audit','listing'].forEach(m => {
       document.getElementById(`mode-${m}`).classList.toggle('hidden', m !== mode);
       document.getElementById(`tab-${m}`).classList.toggle('active', m === mode);
     });
@@ -3587,6 +3748,139 @@
     }).join('');
 
     showEl('report-results-card');
+  }
+
+  // ── Listing Optimizer ─────────────────────────────────────────
+
+  let listingOptimizerData = null;
+
+  function getListingPayload() {
+    return {
+      asin: document.getElementById('lo-asin').value.trim(),
+      brand: document.getElementById('lo-brand').value.trim(),
+      product_type: document.getElementById('lo-product-type').value.trim(),
+      current_title: document.getElementById('lo-current-title').value.trim(),
+      specs: document.getElementById('lo-specs').value.trim(),
+      sqp_csv: document.getElementById('lo-sqp').value.trim(),
+      ppc_csv: document.getElementById('lo-ppc').value.trim(),
+      reviews_text: document.getElementById('lo-reviews').value.trim(),
+      filter_terms: document.getElementById('lo-filters').value.trim(),
+      must_include: document.getElementById('lo-must').value.trim(),
+      avoid_terms: document.getElementById('lo-avoid').value.trim(),
+      title_limit: Number(document.getElementById('lo-title-limit').value || 75),
+    };
+  }
+
+  async function runListingOptimizer() {
+    const payload = getListingPayload();
+    if (!payload.product_type) {
+      document.getElementById('lo-error').textContent = 'Product type is required.';
+      showEl('lo-error');
+      return;
+    }
+    const button = document.getElementById('lo-run-btn');
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner"></span> Optimizing...';
+    showEl('lo-progress');
+    hideEl('lo-error');
+    hideEl('lo-results-card');
+    try {
+      const response = await fetchWithTimeout(`${API_BASE}/api/listing-optimizer`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload),
+      }, 180000);
+      const data = await readApiResponse(response, 'Listing optimization failed.');
+      listingOptimizerData = data;
+      renderListingOptimizer(data);
+    } catch (error) {
+      document.getElementById('lo-error').textContent = '⚠ ' + error.message;
+      showEl('lo-error');
+    } finally {
+      hideEl('lo-progress');
+      button.disabled = false;
+      button.innerHTML = 'Optimize Listing';
+    }
+  }
+
+  function renderListingOptimizer(data) {
+    const r = data.result || {};
+    const s = data.summary || {};
+    document.getElementById('lo-summary-bar').innerHTML = `
+      <div class="summary-stat"><div class="val val-orange">${s.title_characters || 0}</div><div class="lbl">Title Characters</div></div>
+      <div class="summary-stat"><div class="val val-green">${s.scored_terms || 0}</div><div class="lbl">Scored Terms</div></div>
+      <div class="summary-stat"><div class="val val-orange">${s.sqp_rows || 0}</div><div class="lbl">SQP Rows</div></div>
+      <div class="summary-stat"><div class="val val-green">${s.ppc_rows || 0}</div><div class="lbl">PPC Rows</div></div>
+      <div class="summary-stat"><div class="val ${data.ai_used ? 'val-green' : 'val-orange'}">${data.ai_used ? 'AI' : 'Rule'}</div><div class="lbl">Rewrite Mode</div></div>
+    `;
+    document.getElementById('lo-title-output').textContent = r.title || '';
+    document.getElementById('lo-highlights-output').textContent = (r.item_highlights || []).map((x, i) => `${i + 1}. ${x}`).join('\n');
+    document.getElementById('lo-bullets-output').textContent = (r.bullets || []).map((x, i) => `${i + 1}. ${x}`).join('\n\n');
+    document.getElementById('lo-backend-output').textContent = r.backend_keywords || '';
+    document.getElementById('lo-validation-output').innerHTML = (data.validation || []).map(check => {
+      const cls = `validation-${check.status || 'warn'}`;
+      return `<div><strong class="${cls}">${escHtml(String(check.status || '').toUpperCase())}</strong> · ${escHtml(check.name || '')}<br><span style="color:var(--text-muted)">${escHtml(check.detail || '')}</span></div>`;
+    }).join('<br>');
+    document.getElementById('lo-terms-body').innerHTML = (data.scored_terms || []).slice(0, 40).map(item => `
+      <tr>
+        <td style="font-weight:600">${escHtml(item.term || '')}</td>
+        <td>${escHtml(String(item.score || 0))}</td>
+        <td>${escHtml(String(item.sqp_score || 0))}</td>
+        <td>${escHtml(String(item.ppc_score || 0))}</td>
+        <td>${escHtml(String(item.review_score || 0))}</td>
+        <td>${escHtml(String(item.filter_score || 0))}</td>
+        <td style="font-size:12px;color:var(--text-muted)">${escHtml(item.evidence || '')}</td>
+      </tr>
+    `).join('');
+    showEl('lo-results-card');
+    document.getElementById('lo-results-card').scrollIntoView({behavior:'smooth'});
+  }
+
+  function fillListingExample() {
+    document.getElementById('lo-asin').value = 'B0EXAMPLE';
+    document.getElementById('lo-brand').value = 'AquaPeak';
+    document.getElementById('lo-product-type').value = 'Above Ground Pool';
+    document.getElementById('lo-current-title').value = 'AquaPeak Family Pool Set with Canopy, Filter Pump, Steel Frame, Outdoor Backyard Swimming Pool';
+    document.getElementById('lo-specs').value = '10 ft x 30 in above-ground pool, filter pump included, removable canopy, rust-resistant steel frame, drain plug, family backyard use';
+    document.getElementById('lo-sqp').value = 'Search Query,Impressions,Clicks,Cart Adds,Purchases\nabove ground pool,18200,520,72,31\npool with filter pump,9400,330,41,22\npool with canopy,6100,210,33,18\nfamily pool outdoor,4200,96,16,7';
+    document.getElementById('lo-ppc').value = 'Keyword,Impressions,Clicks,Spend,Orders,Sales,CVR,ACoS\nabove ground pool,15000,440,286,35,1399,7.9%,20.4%\npool with filter pump,7800,260,164,23,918,8.8%,17.9%\npool with canopy,4100,180,109,17,679,9.4%,16.1%';
+    document.getElementById('lo-reviews').value = 'easy setup, kids love the canopy, filter pump keeps water clear, sturdy frame, perfect backyard pool';
+    document.getElementById('lo-filters').value = 'above ground, filter pump, canopy, steel frame, outdoor pool';
+    document.getElementById('lo-must').value = 'filter pump, canopy, above ground';
+    document.getElementById('lo-avoid').value = '';
+  }
+
+  function clearListingOptimizer() {
+    ['lo-asin','lo-brand','lo-product-type','lo-current-title','lo-specs','lo-sqp','lo-ppc','lo-reviews','lo-filters','lo-must','lo-avoid'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('lo-title-limit').value = '75';
+    listingOptimizerData = null;
+    hideEl('lo-results-card');
+    hideEl('lo-error');
+    hideEl('lo-progress');
+  }
+
+  function exportListingCSV() {
+    if (!listingOptimizerData?.scored_terms?.length) return;
+    const rows = [['Term','Score','SQP Score','PPC Score','Review Score','Filter Score','Evidence']];
+    listingOptimizerData.scored_terms.forEach(item => rows.push([
+      item.term || '',
+      String(item.score || 0),
+      String(item.sqp_score || 0),
+      String(item.ppc_score || 0),
+      String(item.review_score || 0),
+      String(item.filter_score || 0),
+      item.evidence || '',
+    ]));
+    const csv = rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `listing-keyword-brief-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   // ── Export ────────────────────────────────────────────────────

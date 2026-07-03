@@ -914,6 +914,40 @@ class CSVExportRequest(BaseModel):
     rows: list[list[str]]
 
 
+class ListingOptimizerRequest(BaseModel):
+    asin: str = ""
+    brand: str = ""
+    product_type: str
+    current_title: str = ""
+    specs: str = ""
+    sqp_csv: str = ""
+    ppc_csv: str = ""
+    reviews_text: str = ""
+    filter_terms: str = ""
+    must_include: str = ""
+    avoid_terms: str = ""
+    title_limit: int = 75
+
+
+LISTING_OPTIMIZER_SYSTEM_PROMPT = """You are an Amazon listing optimization strategist. You rewrite listing fields using buyer data, not generic product copy.
+
+Rules:
+- Respect the title character limit exactly.
+- Prioritize terms with evidence from SQP, PPC, reviews, and Amazon filter behavior.
+- Do not invent product facts.
+- Do not keyword stuff.
+- Keep title readable and commercially natural.
+- Backend keywords must avoid repeating words already used heavily in title and bullets.
+- Return ONLY valid JSON with this shape:
+{
+  "title": "string",
+  "item_highlights": ["string", "string", "string", "string"],
+  "bullets": ["string", "string", "string", "string", "string"],
+  "backend_keywords": "string",
+  "rationale": ["string", "string", "string"]
+}"""
+
+
 REPORT_SYSTEM_PROMPT = """You are a senior Amazon PPC strategist producing a concise decision table. For each ASIN + keyword/search query group, you compare ALL campaigns/ad groups and output ONE recommendation row per campaign entry.
 
 You are analyzing a full Amazon Sponsored Products workbook with search term, targeting, placement, and advertised-product sheets. Some ASIN assignments are inferred from Campaign + Ad Group using the advertised-product sheet. Treat each campaign/ad group as a separate structure, compare them against each other, then choose winners.
@@ -1457,6 +1491,272 @@ def _parse_full_ads_workbook(content: bytes) -> dict[str, list[ReportCampaignRow
         sheets["targeting"],
         sheets["placement"],
     )
+
+
+def _split_terms(text: str) -> list[str]:
+    terms = []
+    seen = set()
+    for part in re.split(r"[\n,;|]+", text or ""):
+        term = " ".join(part.strip().strip('"').split())
+        key = term.lower()
+        if term and key not in seen:
+            seen.add(key)
+            terms.append(term)
+    return terms
+
+
+def _parse_csvish(text: str) -> list[dict]:
+    text = (text or "").strip()
+    if not text:
+        return []
+    rows = list(csv.reader(io.StringIO(text)))
+    rows = [row for row in rows if any(str(cell).strip() for cell in row)]
+    if not rows:
+        return []
+    headers = [_norm_key(cell) for cell in rows[0]]
+    looks_like_header = any(
+        any(needle in header for needle in ("keyword", "query", "search term", "impression", "click", "purchase", "order", "sales", "spend", "acos", "cvr"))
+        for header in headers
+    )
+    if looks_like_header:
+        data_rows = rows[1:]
+    else:
+        headers = ["term"] + [f"metric_{i}" for i in range(1, max(len(row) for row in rows))]
+        data_rows = rows
+    output = []
+    for row in data_rows:
+        item = {}
+        for index, header in enumerate(headers):
+            item[header] = row[index].strip() if index < len(row) else ""
+        output.append(item)
+    return output
+
+
+def _row_first(row: dict, *needles: str) -> str:
+    for needle in needles:
+        for key, value in row.items():
+            if needle in key and value not in (None, ""):
+                return str(value)
+    return ""
+
+
+def _term_metric_score(term: str, sqp_rows: list[dict], ppc_rows: list[dict], review_terms: list[str], filter_terms: list[str], must_terms: list[str]) -> dict:
+    term_key = _keyword_key(term)
+    sqp_score = 0.0
+    ppc_score = 0.0
+    review_score = 0.0
+    filter_score = 0.0
+    evidence = []
+
+    for row in sqp_rows:
+        row_term = _row_first(row, "keyword", "query", "search term", "term") or next(iter(row.values()), "")
+        if not _keyword_related(term_key, row_term):
+            continue
+        impressions = _num(_row_first(row, "impression"))
+        clicks = _num(_row_first(row, "click"))
+        purchases = _num(_row_first(row, "purchase", "order"))
+        cart_adds = _num(_row_first(row, "cart"))
+        sqp_score += min(30, math.log(impressions + 1) * 2.0) + min(18, purchases * 3.0) + min(8, cart_adds * 0.8) + min(8, clicks * 0.25)
+    if sqp_score:
+        evidence.append("SQP demand")
+
+    for row in ppc_rows:
+        row_term = _row_first(row, "keyword", "query", "search term", "targeting", "term") or next(iter(row.values()), "")
+        if not _keyword_related(term_key, row_term):
+            continue
+        clicks = _num(_row_first(row, "click"))
+        orders = _num(_row_first(row, "order", "purchase"))
+        sales = _num(_row_first(row, "sale", "revenue"))
+        spend = _num(_row_first(row, "spend", "cost"))
+        cvr = _rate(_row_first(row, "cvr", "conversion"))
+        acos = _rate(_row_first(row, "acos"))
+        roas = sales / spend if spend > 0 else 0
+        if not cvr and clicks > 0:
+            cvr = orders / clicks
+        ppc_score += min(26, orders * 5.0) + min(22, cvr * 160) + min(14, roas * 3.5)
+        if acos and acos < 0.35:
+            ppc_score += 8
+    if ppc_score:
+        evidence.append("PPC conversion")
+
+    review_text = " ".join(review_terms).lower()
+    if term_key and term_key in review_text:
+        review_score = 18
+        evidence.append("review language")
+    else:
+        shared_count = sum(1 for item in review_terms if _keyword_related(term_key, item))
+        if shared_count:
+            review_score = min(18, shared_count * 6)
+            evidence.append("review language")
+
+    if any(_keyword_related(term_key, ft) for ft in filter_terms):
+        filter_score = 18
+        evidence.append("filter/spec")
+    if any(_keyword_related(term_key, mt) for mt in must_terms):
+        filter_score += 22
+        evidence.append("must-include")
+
+    efficiency = max(0, 12 - max(0, len(term) - 18) * 0.6)
+    total = round(sqp_score + ppc_score + review_score + filter_score + efficiency, 1)
+    return {
+        "term": term,
+        "score": total,
+        "sqp_score": round(sqp_score, 1),
+        "ppc_score": round(ppc_score, 1),
+        "review_score": round(review_score, 1),
+        "filter_score": round(filter_score, 1),
+        "evidence": ", ".join(dict.fromkeys(evidence)) or "manual/context",
+    }
+
+
+def _collect_listing_terms(req: ListingOptimizerRequest) -> list[str]:
+    terms = []
+    for row in _parse_csvish(req.sqp_csv):
+        terms.append(_row_first(row, "keyword", "query", "search term", "term") or next(iter(row.values()), ""))
+    for row in _parse_csvish(req.ppc_csv):
+        terms.append(_row_first(row, "keyword", "query", "search term", "targeting", "term") or next(iter(row.values()), ""))
+    terms.extend(_split_terms(req.filter_terms))
+    terms.extend(_split_terms(req.must_include))
+    for text in [req.current_title, req.specs]:
+        for phrase in re.findall(r"[A-Za-z0-9][A-Za-z0-9 -]{2,}", text or ""):
+            if len(phrase.split()) <= 5:
+                terms.append(phrase.strip())
+    output = []
+    seen = set()
+    for term in terms:
+        term = " ".join(str(term or "").strip().split())
+        key = _keyword_key(term)
+        if key and key not in seen and len(term) <= 60:
+            seen.add(key)
+            output.append(term)
+    return output
+
+
+def _build_draft_title(req: ListingOptimizerRequest, ranked_terms: list[dict]) -> str:
+    limit = max(40, min(200, req.title_limit or 75))
+    parts = []
+    if req.brand.strip():
+        parts.append(req.brand.strip())
+    if req.product_type.strip() and req.product_type.lower() not in " ".join(parts).lower():
+        parts.append(req.product_type.strip())
+    for item in ranked_terms:
+        term = item["term"]
+        if term.lower() in " ".join(parts).lower():
+            continue
+        candidate = " ".join(parts + [term])
+        if len(candidate) <= limit:
+            parts.append(term)
+        if len(" ".join(parts)) >= limit - 12:
+            break
+    return " ".join(parts)[:limit].strip(" ,;-")
+
+
+def _listing_validation(title: str, req: ListingOptimizerRequest, ranked_terms: list[dict]) -> list[dict]:
+    limit = max(40, min(200, req.title_limit or 75))
+    title_key = title.lower()
+    top_terms = [item["term"] for item in ranked_terms[:8]]
+    missing = [term for term in top_terms if term.lower() not in title_key and len(term) <= 28]
+    checks = [
+        {"name": "Title length", "status": "pass" if len(title) <= limit else "fail", "detail": f"{len(title)} / {limit} characters"},
+        {"name": "Product type present", "status": "pass" if req.product_type.lower() in title_key else "warn", "detail": req.product_type},
+        {"name": "High-value title coverage", "status": "pass" if len(missing) <= 3 else "warn", "detail": ", ".join(missing[:5]) or "Top terms covered"},
+    ]
+    avoid_hits = [term for term in _split_terms(req.avoid_terms) if term.lower() in title_key]
+    checks.append({"name": "Avoid terms", "status": "pass" if not avoid_hits else "fail", "detail": ", ".join(avoid_hits) or "None found"})
+    return checks
+
+
+@app.post("/api/listing-optimizer")
+async def listing_optimizer(req: ListingOptimizerRequest):
+    if not req.product_type.strip():
+        raise HTTPException(status_code=400, detail="Product type is required.")
+
+    sqp_rows = _parse_csvish(req.sqp_csv)
+    ppc_rows = _parse_csvish(req.ppc_csv)
+    review_terms = _split_terms(req.reviews_text)
+    filter_terms = _split_terms(req.filter_terms)
+    must_terms = _split_terms(req.must_include)
+    avoid_terms = {term.lower() for term in _split_terms(req.avoid_terms)}
+
+    scored = [
+        _term_metric_score(term, sqp_rows, ppc_rows, review_terms, filter_terms, must_terms)
+        for term in _collect_listing_terms(req)
+        if term.lower() not in avoid_terms
+    ]
+    scored.sort(key=lambda item: item["score"], reverse=True)
+    scored = scored[:60]
+    draft_title = _build_draft_title(req, scored)
+
+    result = {
+        "title": draft_title,
+        "item_highlights": [
+            item["term"] for item in scored
+            if item["term"].lower() not in draft_title.lower()
+        ][:4],
+        "bullets": [
+            f"{item['term']}: supported by {item['evidence']} signals."
+            for item in scored[:5]
+        ],
+        "backend_keywords": " ".join(item["term"] for item in scored[8:24])[:249],
+        "rationale": [
+            "Ranked terms by SQP demand, PPC conversion, review language, filter/spec relevance, and character efficiency.",
+            "Title draft fills the available character limit with the strongest non-duplicative buyer terms.",
+            "Backend keywords reserve secondary phrases that do not need visible title placement.",
+        ],
+    }
+
+    ai_used = False
+    if ANTHROPIC_API_KEY:
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        brief = {
+            "asin": req.asin,
+            "brand": req.brand,
+            "product_type": req.product_type,
+            "current_title": req.current_title,
+            "title_limit": req.title_limit,
+            "specs": req.specs,
+            "must_include": must_terms,
+            "avoid_terms": list(avoid_terms),
+            "ranked_keyword_brief": scored[:25],
+            "fallback_draft": result,
+        }
+        message = _anthropic_create_message(
+            client,
+            model="claude-sonnet-4-6",
+            max_tokens=3500,
+            system=LISTING_OPTIMIZER_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": json.dumps(brief, ensure_ascii=False)}],
+        )
+        raw = message.content[0].text.strip()
+        try:
+            parsed = _parse_raw_json(raw)
+            if isinstance(parsed, dict) and parsed.get("title"):
+                result.update(parsed)
+                ai_used = True
+        except Exception:
+            logger.warning("Listing optimizer AI JSON parse failed; returning deterministic draft.", exc_info=True)
+
+    title = str(result.get("title") or draft_title).strip()
+    if len(title) > req.title_limit:
+        title = title[:req.title_limit].rsplit(" ", 1)[0].strip(" ,;-") or title[:req.title_limit]
+    result["title"] = title
+
+    return {
+        "asin": req.asin.strip().upper(),
+        "ai_used": ai_used,
+        "result": result,
+        "scored_terms": scored,
+        "validation": _listing_validation(title, req, scored),
+        "summary": {
+            "sqp_rows": len(sqp_rows),
+            "ppc_rows": len(ppc_rows),
+            "review_terms": len(review_terms),
+            "filter_terms": len(filter_terms),
+            "scored_terms": len(scored),
+            "title_characters": len(title),
+            "title_limit": req.title_limit,
+        },
+    }
 
 
 def _merge_ads_maps(maps: list[dict[str, list[ReportCampaignRow]]]) -> dict[str, list[ReportCampaignRow]]:
