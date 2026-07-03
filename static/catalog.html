@@ -9,9 +9,9 @@
 body { font-family: -apple-system,'Segoe UI',Helvetica,Arial,sans-serif;
   margin: 0; min-height: 100vh; color: rgba(255,255,255,.88);
   background: linear-gradient(135deg,#0f0c29 0%,#302b63 55%,#24243e 100%) fixed; }
-.wrap { max-width: 1080px; margin: 0 auto; padding: 32px 20px 80px; }
+.wrap { max-width: 1080px; margin: 0 auto; padding: 28px 20px 80px; }
 h1 { font-size: 24px; font-weight: 600; color: #fff; margin: 0; }
-.sub { color: rgba(255,255,255,.5); font-size: 13px; margin: 4px 0 24px; }
+.sub { color: rgba(255,255,255,.5); font-size: 13px; margin: 4px 0 20px; }
 .glass { background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14);
   border-radius: 16px; padding: 20px; margin: 0 0 18px;
   backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
@@ -22,38 +22,46 @@ label { font-size: 12px; color: rgba(255,255,255,.55); display: block; margin: 0
 input, select, button, textarea { font: inherit; color: #fff; border-radius: 10px;
   border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.07);
   padding: 8px 12px; outline: none; }
-input:focus, select:focus, textarea:focus { border-color: rgba(165,180,252,.6); }
+input:focus, select:focus { border-color: rgba(165,180,252,.6); }
 select option { color: #111; }
 button { cursor: pointer; font-weight: 600; transition: all .15s; }
 button:hover { background: rgba(255,255,255,.14); }
 button.primary { background: linear-gradient(90deg,#6366f1,#8b5cf6); border: none; }
 button.primary:hover { filter: brightness(1.15); }
-button.go { background: linear-gradient(90deg,#34d399,#22d3ee); color: #052e2b;
-  border: none; }
+button.go { background: linear-gradient(90deg,#34d399,#22d3ee); color: #052e2b; border: none; }
+button.link { background: none; border: none; color: #93c5fd; font-weight: 400;
+  font-size: 12px; padding: 4px 6px; }
 button:disabled { opacity: .4; cursor: default; }
 .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
 .grow { flex: 1; min-width: 140px; }
-.pill { display: inline-block; padding: 3px 12px; border-radius: 999px;
-  font-size: 12px; font-weight: 600; margin: 0 6px 6px 0;
+.pill { display: inline-block; padding: 4px 14px; border-radius: 999px;
+  font-size: 13px; font-weight: 600; margin: 0 8px 8px 0;
   background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); }
 .pill.ok { background: rgba(52,211,153,.14); border-color: rgba(52,211,153,.4); color: #6ee7b7; }
 .pill.warn { background: rgba(251,191,36,.14); border-color: rgba(251,191,36,.4); color: #fcd34d; }
 .pill.bad { background: rgba(248,113,113,.14); border-color: rgba(248,113,113,.4); color: #fca5a5; }
+.dl { display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px;
+  border-radius: 12px; margin: 0 10px 10px 0; text-decoration: none;
+  font-size: 14px; font-weight: 600; color: #fff;
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.2);
+  transition: all .15s; }
+.dl:hover { background: rgba(255,255,255,.16); }
+.dl.big { background: linear-gradient(90deg,#34d399,#22d3ee); color: #052e2b; border: none; }
+.dl.big:hover { filter: brightness(1.1); }
+.dl small { display: block; font-weight: 400; font-size: 11px; opacity: .75; }
 .drop { border: 2px dashed rgba(255,255,255,.25); border-radius: 14px;
-  padding: 28px; text-align: center; color: rgba(255,255,255,.55);
+  padding: 24px; text-align: center; color: rgba(255,255,255,.55);
   font-size: 14px; transition: all .2s; cursor: pointer; }
 .drop.over { border-color: #22d3ee; background: rgba(34,211,238,.08); color: #67e8f9; }
 #log { font-family: ui-monospace, Menlo, monospace; font-size: 12px;
   background: rgba(0,0,0,.35); border-radius: 10px; padding: 12px;
-  max-height: 240px; overflow-y: auto; white-space: pre-wrap;
+  max-height: 220px; overflow-y: auto; white-space: pre-wrap;
   color: rgba(255,255,255,.75); display: none; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { text-align: left; padding: 8px 10px;
   border-bottom: 1px solid rgba(255,255,255,.08); vertical-align: top; }
-th { color: rgba(255,255,255,.5); font-size: 11px; text-transform: uppercase;
-  letter-spacing: .5px; }
-a.art { color: #93c5fd; text-decoration: none; margin-right: 10px; font-size: 12px;
-  white-space: nowrap; }
+th { color: rgba(255,255,255,.5); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+a.art { color: #93c5fd; text-decoration: none; margin-right: 10px; font-size: 12px; white-space: nowrap; }
 a.art:hover { text-decoration: underline; }
 .flag { background: rgba(255,255,255,.04); border: 1px solid rgba(251,191,36,.25);
   border-radius: 12px; padding: 12px 14px; margin: 0 0 10px; }
@@ -63,9 +71,12 @@ a.art:hover { text-decoration: underline; }
 .muted { color: rgba(255,255,255,.45); font-size: 12px; }
 .termpill { display: inline-flex; gap: 6px; align-items: center; padding: 3px 10px;
   border-radius: 999px; background: rgba(165,180,252,.12);
-  border: 1px solid rgba(165,180,252,.35); color: #c7d2fe; font-size: 12px;
-  margin: 0 6px 6px 0; }
+  border: 1px solid rgba(165,180,252,.35); color: #c7d2fe; font-size: 12px; margin: 0 6px 6px 0; }
 .termpill b { cursor: pointer; }
+.topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 18px;
+  flex-wrap: wrap; }
+.topbar .spacer { flex: 1; }
+#manage { display: none; }
 </style>
 </head>
 <body>
@@ -73,10 +84,17 @@ a.art:hover { text-decoration: underline; }
   <h1>Catalog Optimizer</h1>
   <div class="sub">Amazon Category Listing Report → compliant, optimized content. Review before upload — nothing publishes automatically.</div>
 
-  <div class="glass">
-    <h2>Seller</h2>
+  <div class="topbar">
+    <label style="margin:0">Seller</label>
+    <select id="seller" onchange="switchSeller()"></select>
+    <span id="termsInline" class="muted"></span>
+    <span class="spacer"></span>
+    <button class="link" onclick="toggleManage()">Manage sellers &amp; attested facts ▾</button>
+  </div>
+
+  <div class="glass" id="manage">
+    <h2>Sellers &amp; attested facts</h2>
     <div class="row">
-      <div><label>Active seller</label><select id="seller" onchange="switchSeller()"></select></div>
       <div class="grow"><label>New seller id</label><input id="newSellerId" placeholder="acme-displays"></div>
       <div><label>Marketplace</label><select id="newMp"><option>US</option><option>UK</option><option>EU</option><option>CA</option></select></div>
       <div><label>On limit violation</label><select id="newLimit"><option value="auto_trim">auto-trim</option><option value="flag">flag for review</option></select></div>
@@ -93,8 +111,14 @@ a.art:hover { text-decoration: underline; }
     </div>
   </div>
 
+  <div class="glass" id="latest" style="display:none">
+    <h2>Latest results <span class="muted" id="latestMeta"></span></h2>
+    <div id="latestPills"></div>
+    <div id="latestDl"></div>
+  </div>
+
   <div class="glass">
-    <h2>Run</h2>
+    <h2>New run</h2>
     <div class="drop" id="drop" onclick="document.getElementById('file').click()">
       Drop the Category Listing Report (.xlsm) here, or click to choose
       <input type="file" id="file" accept=".xlsm,.xlsx" style="display:none" onchange="uploadFile(this.files[0])">
@@ -114,22 +138,22 @@ a.art:hover { text-decoration: underline; }
   </div>
 
   <div class="glass">
-    <h2>Needs review</h2>
-    <div class="muted" id="flagNote">Pick a run below to load its flagged SKUs.</div>
+    <h2>Needs review <span class="muted" id="flagMeta"></span></h2>
+    <div class="muted" id="flagNote">Nothing flagged — or no finished run yet.</div>
     <div id="flags"></div>
     <div class="row" style="margin-top:8px">
-      <button class="primary" id="approveBtn" style="display:none" onclick="approveChecked()">Approve checked → approved_upload.xlsx</button>
+      <button class="primary" id="approveBtn" style="display:none" onclick="approveChecked()">Approve checked → download file</button>
     </div>
   </div>
 
   <div class="glass">
-    <h2>Runs &amp; downloads</h2>
+    <h2>Run history</h2>
     <div class="row" style="margin-bottom:10px">
       <button onclick="refreshRuns()">Refresh</button>
       <button class="primary" onclick="mergeChecked()">Merge checked runs → one upload file</button>
     </div>
     <table id="runsTable"><thead><tr>
-      <th></th><th>Run</th><th>Result</th><th>Artifacts</th>
+      <th></th><th>Run</th><th>Result</th><th>Downloads</th>
     </tr></thead><tbody></tbody></table>
   </div>
 </div>
@@ -142,7 +166,19 @@ const api = (p, opts) => fetch('/catalog/api' + p, opts).then(async r => {
 });
 const $ = id => document.getElementById(id);
 let sellers = [], activeSeller = null, reviewRun = null;
+const DL_LABELS = {
+  "merged_upload.xlsx": ["Amazon upload — merged", "all approved SKUs, one file", true],
+  "approved_upload.xlsx": ["Amazon upload — approved after review", "SKUs you approved", true],
+  "upload.xlsx": ["Amazon upload file", "this run's approved SKUs", false],
+  "results.xlsx": ["Results + corrections (Excel)", "content, counts, issues, compliance log", false],
+  "results.csv": ["Results (CSV)", "same data, plain csv", false],
+  "report.html": ["Review report", "before/after per SKU", false],
+};
 
+function toggleManage() {
+  const m = $('manage');
+  m.style.display = m.style.display === 'block' ? 'none' : 'block';
+}
 async function boot() {
   sellers = await api('/sellers');
   const sel = $('seller');
@@ -154,15 +190,16 @@ async function switchSeller() {
   activeSeller = $('seller').value || null;
   if (!activeSeller) return;
   renderTerms();
-  await Promise.all([refreshUploads(), refreshRuns()]);
-  $('flags').innerHTML = ''; $('approveBtn').style.display = 'none';
-  $('flagNote').style.display = '';
+  await refreshUploads();
+  await refreshRuns();   // also fills "Latest results" + flagged
 }
 function cfg() { return sellers.find(s => s.seller_id === activeSeller) || {}; }
 function renderTerms() {
   const t = cfg().attested_terms || {};
-  $('terms').innerHTML = Object.entries(t).map(([k,v]) =>
-    `<span class="termpill" title="${v.replace(/"/g,'&quot;')}">${k} <b onclick="removeTerm('${k}')">✕</b></span>`
+  const keys = Object.keys(t);
+  $('termsInline').textContent = keys.length ? `attested: ${keys.join(', ')}` : '';
+  $('terms').innerHTML = keys.map(k =>
+    `<span class="termpill" title="${t[k].replace(/"/g,'&quot;')}">${k} <b onclick="removeTerm('${k}')">✕</b></span>`
   ).join('') || '<span class="muted">none yet</span>';
 }
 async function createSeller() {
@@ -195,11 +232,11 @@ drop.addEventListener('drop', ev => { const f = ev.dataTransfer.files[0]; if (f)
 async function uploadFile(f) {
   if (!f || !activeSeller) return;
   drop.textContent = 'Uploading ' + f.name + ' ...';
-  const fd = new FormData(); fd.append('file', f);
   try {
+    const fd = new FormData(); fd.append('file', f);
     await fetch(`/catalog/api/sellers/${activeSeller}/upload`, {method:'POST', body: fd})
       .then(async r => { if (!r.ok) throw new Error((await r.json()).detail); });
-    drop.textContent = f.name + ' uploaded ✓ — drop another, or start the run';
+    drop.textContent = f.name + ' uploaded ✓ — now press Start run';
     await refreshUploads();
   } catch (e) { drop.textContent = 'Upload failed: ' + e.message; }
 }
@@ -232,43 +269,60 @@ async function poll(ticket) {
   if (p.done) {
     clearInterval(pollTimer); $('runBtn').disabled = false;
     if (p.error) { el.textContent += '\n\nERROR: ' + p.error; return; }
-    const s = p.summary;
-    $('runStats').innerHTML =
-      `<span class="pill ok">${s.generated - s.needs_review} upload-ready</span>` +
-      `<span class="pill warn">${s.needs_review} needs review</span>` +
-      `<span class="pill ${s.failed ? 'bad' : ''}">${s.failed} failed</span>` +
-      `<span class="pill">${s.skipped_unchanged} unchanged (skipped)</span>`;
     await refreshRuns();
-    if (s.needs_review > 0 && p.run_id) loadFlags(p.run_id);
   }
+}
+
+function dlButtons(runId, arts, bigFirst) {
+  const order = ["merged_upload.xlsx","approved_upload.xlsx","upload.xlsx",
+                 "results.xlsx","results.csv","report.html"];
+  return order.filter(a => arts.includes(a)).map((a, i) => {
+    const [label, sub, big] = DL_LABELS[a];
+    const cls = (bigFirst && (big || i === 0)) ? 'dl big' : 'dl';
+    return `<a class="${cls}" href="/catalog/api/sellers/${activeSeller}/runs/${runId}/file/${a}" target="_blank">
+      <span>${label}<small>${sub}</small></span></a>`;
+  }).join('');
 }
 
 async function refreshRuns() {
   const runs = await api(`/sellers/${activeSeller}/runs`);
   const tb = $('runsTable').querySelector('tbody');
   tb.innerHTML = '';
+  let latestDone = null;
   for (const r of runs) {
     const s = r.summary || {};
     const arts = await api(`/sellers/${activeSeller}/runs/${r.run_id}/artifacts`).catch(()=>[]);
+    if (!latestDone && r.finished_at && arts.length) latestDone = {r, s, arts};
     const links = arts.map(a =>
       `<a class="art" href="/catalog/api/sellers/${activeSeller}/runs/${r.run_id}/file/${a}" target="_blank">${a}</a>`).join('');
     const result = r.finished_at
-      ? `${(s.generated ?? 0) - (s.needs_review ?? 0)} ok · ` +
-        `<a class="art" href="#" onclick="loadFlags('${r.run_id}');return false">${s.needs_review ?? 0} review</a>` +
-        ` · ${s.failed ?? 0} failed`
+      ? `${(s.generated ?? 0) - (s.needs_review ?? 0)} ok · ${s.needs_review ?? 0} review · ${s.failed ?? 0} failed`
       : 'running…';
     tb.insertAdjacentHTML('beforeend',
       `<tr><td><input type="checkbox" class="runck" value="${r.run_id}"></td>` +
       `<td><div>${r.run_id}</div><div class="muted">${(r.source_file||'').split('/').pop()}</div></td>` +
       `<td>${result}</td><td>${links}</td></tr>`);
   }
+  if (latestDone) {
+    const {r, s, arts} = latestDone;
+    $('latest').style.display = '';
+    $('latestMeta').textContent = `run ${r.run_id}`;
+    $('latestPills').innerHTML =
+      `<span class="pill ok">${(s.generated ?? 0) - (s.needs_review ?? 0)} upload-ready</span>` +
+      `<span class="pill warn">${s.needs_review ?? 0} needs review</span>` +
+      `<span class="pill ${s.failed ? 'bad' : ''}">${s.failed ?? 0} failed</span>` +
+      `<span class="pill">${s.skipped_unchanged ?? 0} unchanged</span>`;
+    $('latestDl').innerHTML = dlButtons(r.run_id, arts, true);
+    loadFlags(r.run_id);
+  }
 }
 
 async function loadFlags(runId) {
   reviewRun = runId;
-  const flags = await api(`/sellers/${activeSeller}/runs/${runId}/flagged`);
-  $('flagNote').style.display = 'none';
-  $('flags').innerHTML = flags.length ? flags.map(f => `
+  const flags = await api(`/sellers/${activeSeller}/runs/${runId}/flagged`).catch(()=>[]);
+  $('flagMeta').textContent = `run ${runId}`;
+  $('flagNote').style.display = flags.length ? 'none' : '';
+  $('flags').innerHTML = flags.map(f => `
     <div class="flag">
       <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer">
         <input type="checkbox" class="flagck" value="${f.sku}" style="margin-top:3px">
@@ -278,8 +332,7 @@ async function loadFlags(runId) {
           <div class="txt">${(f.generated?.title)||''}</div>
         </div>
       </label>
-    </div>`).join('')
-    : '<div class="muted">No flagged SKUs in this run.</div>';
+    </div>`).join('');
   $('approveBtn').style.display = flags.length ? '' : 'none';
 }
 async function approveChecked() {
@@ -288,8 +341,8 @@ async function approveChecked() {
   if (!confirm(`Approve ${skus.length} SKU(s)? This writes approved_upload.xlsx and records your approval in the audit log.`)) return;
   const r = await api(`/sellers/${activeSeller}/runs/${reviewRun}/approve`, {method:'POST',
     headers:{'Content-Type':'application/json'}, body: JSON.stringify({skus})});
-  alert(`${r.written} SKU(s) written to approved_upload.xlsx`);
-  await refreshRuns(); await loadFlags(reviewRun);
+  alert(`${r.written} SKU(s) written to approved_upload.xlsx — download it from Latest results`);
+  await refreshRuns();
 }
 async function mergeChecked() {
   const ids = [...document.querySelectorAll('.runck:checked')].map(c => c.value);
