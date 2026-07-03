@@ -115,6 +115,19 @@ a.art:hover { text-decoration: underline; }
     <h2>Latest results <span class="muted" id="latestMeta"></span></h2>
     <div id="latestPills"></div>
     <div id="latestDl"></div>
+    <div class="row" style="margin:14px 0 8px">
+      <input id="dashSearch" placeholder="Search SKU / product type / correction…" style="flex:1" oninput="renderDash()">
+      <select id="dashFilter" onchange="renderDash()">
+        <option value="">All statuses</option>
+        <option value="ok">Upload-ready</option>
+        <option value="needs_review">Needs review</option>
+        <option value="failed">Failed</option>
+      </select>
+    </div>
+    <div id="dash"></div>
+    <div style="text-align:center;margin-top:8px">
+      <button id="dashMore" style="display:none" onclick="dashShown+=50;renderDash(true)">Show 50 more</button>
+    </div>
   </div>
 
   <div class="glass">
@@ -167,12 +180,12 @@ const api = (p, opts) => fetch('/catalog/api' + p, opts).then(async r => {
 const $ = id => document.getElementById(id);
 let sellers = [], activeSeller = null, reviewRun = null;
 const DL_LABELS = {
+  "results.xlsx": ["Complete results (Excel)", "originals + corrections + review, one file", true],
   "merged_upload.xlsx": ["Amazon upload — merged", "all approved SKUs, one file", true],
   "approved_upload.xlsx": ["Amazon upload — approved after review", "SKUs you approved", true],
   "upload.xlsx": ["Amazon upload file", "this run's approved SKUs", false],
-  "results.xlsx": ["Results + corrections (Excel)", "content, counts, issues, compliance log", false],
-  "results.csv": ["Results (CSV)", "same data, plain csv", false],
-  "report.html": ["Review report", "before/after per SKU", false],
+  "results.csv": ["CSV", "same data as the Excel", false],
+  "report.html": ["Review report", "printable before/after", false],
 };
 
 function toggleManage() {
@@ -274,14 +287,69 @@ async function poll(ticket) {
 }
 
 function dlButtons(runId, arts, bigFirst) {
-  const order = ["merged_upload.xlsx","approved_upload.xlsx","upload.xlsx",
-                 "results.xlsx","results.csv","report.html"];
+  const order = ["results.xlsx","merged_upload.xlsx","approved_upload.xlsx",
+                 "upload.xlsx","results.csv","report.html"];
   return order.filter(a => arts.includes(a)).map((a, i) => {
     const [label, sub, big] = DL_LABELS[a];
     const cls = (bigFirst && (big || i === 0)) ? 'dl big' : 'dl';
     return `<a class="${cls}" href="/catalog/api/sellers/${activeSeller}/runs/${runId}/file/${a}" target="_blank">
       <span>${label}<small>${sub}</small></span></a>`;
   }).join('');
+}
+
+// ---- inline before/after dashboard --------------------------------------
+let dashRows = [], dashShown = 50;
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+async function loadDash(runId) {
+  $('dash').innerHTML = '<div class="muted">Loading before/after data…</div>';
+  try {
+    const d = await api(`/sellers/${activeSeller}/runs/${runId}/rows`);
+    dashRows = d.rows; dashShown = 50; renderDash();
+  } catch (e) { $('dash').innerHTML = `<div class="muted">${esc(e.message)}</div>`; }
+}
+function baBlock(label, before, after, count) {
+  if (!before && !after) return '';
+  return `<div style="margin:6px 0"><div class="muted">${label} ${count?`<span class="muted">(${count})</span>`:''}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
+      <div style="background:rgba(255,255,255,.04);border-radius:8px;padding:8px;color:rgba(255,255,255,.6)">${esc(before)||'<i>—</i>'}</div>
+      <div style="background:rgba(110,231,183,.07);border:1px solid rgba(110,231,183,.2);border-radius:8px;padding:8px">${esc(after)||'<i>—</i>'}</div>
+    </div></div>`;
+}
+function renderDash(append) {
+  const q = ($('dashSearch').value || '').toLowerCase();
+  const st = $('dashFilter').value;
+  const match = dashRows.filter(r =>
+    (!st || r[2] === st) &&
+    (!q || (r[0]+' '+r[1]+' '+r[3]+' '+r[4]).toLowerCase().includes(q)));
+  const shown = match.slice(0, dashShown);
+  $('dash').innerHTML =
+    `<div class="muted" style="margin-bottom:6px">${match.length} SKU(s)${q||st?' matching':''} — click a row for full before/after</div>` +
+    shown.map(r => {
+      const pill = r[2]==='ok' ? 'ok' : r[2]==='needs_review' ? 'warn' : 'bad';
+      const corr = r[4] ? `<div class="why" style="color:#93c5fd">${esc(r[4])}</div>` : '';
+      const why = r[3] ? `<div class="why">${esc(r[3])}</div>` : '';
+      return `<details style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:8px 12px;margin:0 0 8px">
+        <summary style="cursor:pointer;display:flex;gap:10px;align-items:center;list-style:none">
+          <span class="pill ${pill}" style="margin:0">${r[2]==='ok'?'ready':r[2]==='needs_review'?'review':'failed'}</span>
+          <span style="font-weight:600">${esc(r[0])}</span>
+          <span class="muted">${esc(r[1])}</span>
+          <span class="muted" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r[6]||r[5])}</span>
+        </summary>
+        <div style="margin-top:8px">
+          ${why}${corr}
+          ${baBlock('Title', r[5], r[6], r[7]+'/75 chars')}
+          ${baBlock('Bullet 1', r[11], r[12])}
+          ${baBlock('Bullet 2', r[13], r[14])}
+          ${baBlock('Bullet 3', r[15], r[16], r[17]+' /125 chars')}
+          ${r[8]||r[9]||r[10] ? `<div style="margin:6px 0"><div class="muted">Item highlights (paste into Seller Central manually)</div>
+            <div style="font-size:12px">• ${esc(r[8])}<br>• ${esc(r[9])}<br>• ${esc(r[10])}</div></div>` : ''}
+          ${baBlock('Description', r[18], r[19], r[20]+'/2000 chars')}
+          ${baBlock('Search terms', r[21], r[22], r[23]+'/249 bytes')}
+        </div>
+      </details>`;
+    }).join('');
+  $('dashMore').style.display = match.length > dashShown ? '' : 'none';
 }
 
 async function refreshRuns() {
@@ -314,6 +382,7 @@ async function refreshRuns() {
       `<span class="pill">${s.skipped_unchanged ?? 0} unchanged</span>`;
     $('latestDl').innerHTML = dlButtons(r.run_id, arts, true);
     loadFlags(r.run_id);
+    loadDash(r.run_id);
   }
 }
 

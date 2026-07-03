@@ -282,53 +282,91 @@ def write_upload_subset(
 # per SKU, ready for review in Excel/Sheets or downstream tooling)
 # ---------------------------------------------------------------------------
 _BULK_HEADER = [
-    "sku", "product_type", "status", "skip_reason",
-    "title", "title_chars",
+    "sku", "product_type", "status", "review_reasons", "corrections",
+    "title_before", "title_after", "title_chars",
     "highlight_1", "highlight_2", "highlight_3",
-    "bullet_1", "bullet_2", "bullet_3",
-    "bullet_1_chars", "bullet_2_chars", "bullet_3_chars",
-    "description", "description_chars",
-    "search_terms", "search_terms_bytes",
-    "issues", "compliance_log",
+    "bullet_1_before", "bullet_1_after",
+    "bullet_2_before", "bullet_2_after",
+    "bullet_3_before", "bullet_3_after", "bullet_chars",
+    "description_before", "description_after", "description_chars",
+    "search_terms_before", "search_terms_after", "search_terms_bytes",
 ]
+
+
+def _bulk_row(record, gen_dict: Optional[dict], status: str,
+              review_reasons: str, corrections: str) -> list[Any]:
+    """One export row pairing the source (before) with the generated (after).
+
+    ``gen_dict`` uses the results.json shape so run-time outcomes and
+    rebuilt-from-results exports share this single builder.
+    """
+    g = gen_dict or {}
+    hl = list(g.get("item_highlights", [])) + ["", "", ""]
+    bl = list(g.get("bullets", [])) + ["", "", ""]
+    before_bl = list(record.bullets) + ["", "", ""]
+    title = g.get("title", "")
+    desc = g.get("description", "")
+    terms = g.get("search_terms", "")
+    return [
+        record.sku, record.product_type, status, review_reasons, corrections,
+        record.title or "", title, _chars(title),
+        hl[0], hl[1], hl[2],
+        before_bl[0], bl[0], before_bl[1], bl[1], before_bl[2], bl[2],
+        "|".join(str(_chars(b)) for b in bl[:3]),
+        record.description or "", desc, _chars(desc),
+        " ".join(record.search_terms), terms, _bytes_utf8(terms),
+    ]
 
 
 def _bulk_rows(outcomes: list[SkuOutcome]) -> list[list[Any]]:
     rows: list[list[Any]] = []
     for o in outcomes:
         gen = o.generated
-        hl = list(gen.item_highlights) if gen else []
-        bl = list(gen.bullets) if gen else []
-        hl += [""] * (3 - len(hl))
-        bl += [""] * (3 - len(bl))
-        issues = "; ".join(
-            f"[{i.severity.value if isinstance(i.severity, Severity) else i.severity}] "
+        gen_dict = None
+        if gen is not None:
+            gen_dict = {
+                "title": gen.title, "item_highlights": list(gen.item_highlights),
+                "bullets": list(gen.bullets), "description": gen.description,
+                "search_terms": gen.search_terms,
+            }
+        reasons = "; ".join(
             f"{i.rule} ({i.field_name}): {i.message}" for i in o.issues
-        )
+            if (i.severity.value if isinstance(i.severity, Severity)
+                else str(i.severity)) == "error"
+        ) or o.skip_reason
         clog = "; ".join(f"[{e.category}] {e.reason}" for e in o.compliance_log)
-        rows.append([
-            o.record.sku, o.record.product_type, o.status, o.skip_reason,
-            gen.title if gen else "", _chars(gen.title) if gen else 0,
-            hl[0], hl[1], hl[2],
-            bl[0], bl[1], bl[2],
-            _chars(bl[0]), _chars(bl[1]), _chars(bl[2]),
-            gen.description if gen else "",
-            _chars(gen.description) if gen else 0,
-            gen.search_terms if gen else "",
-            _bytes_utf8(gen.search_terms) if gen else 0,
-            issues, clog,
-        ])
+        rows.append(_bulk_row(o.record, gen_dict, o.status, reasons, clog))
     return rows
 
 
-def _write_results_csv(outcomes: list[SkuOutcome], path: Path) -> None:
+def build_bulk_rows_from_results(parse: ParseResult, results: dict) -> list[list[Any]]:
+    """Rebuild export rows from a run's results.json (originals come from
+    re-parsing the source file). Used by the web UI dashboard and by
+    rebuilding results.csv/xlsx for runs made before the before/after export."""
+    by_sku = parse.by_sku()
+    rows: list[list[Any]] = []
+    for s in results["skus"]:
+        rec = by_sku.get(s["sku"])
+        if rec is None or s["status"] not in ("ok", "needs_review", "failed"):
+            continue
+        reasons = "; ".join(
+            f"{i['rule']} ({i['field_name']}): {i['message']}"
+            for i in s.get("issues", []) if i.get("severity") == "error"
+        ) or s.get("skip_reason", "")
+        clog = "; ".join(f"[{e['category']}] {e['reason']}"
+                         for e in s.get("compliance_log", []))
+        rows.append(_bulk_row(rec, s.get("generated"), s["status"], reasons, clog))
+    return rows
+
+
+def _write_results_csv_rows(rows: list[list[Any]], path: Path) -> None:
     with path.open("w", newline="", encoding="utf-8-sig") as f:  # BOM: Excel-safe
         writer = csv.writer(f)
         writer.writerow(_BULK_HEADER)
-        writer.writerows(_bulk_rows(outcomes))
+        writer.writerows(rows)
 
 
-def _write_results_xlsx(outcomes: list[SkuOutcome], run_id: str, path: Path) -> None:
+def _write_results_xlsx_rows(rows: list[list[Any]], path: Path) -> None:
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Results"
@@ -336,13 +374,13 @@ def _write_results_xlsx(outcomes: list[SkuOutcome], run_id: str, path: Path) -> 
     ws.append(_BULK_HEADER)
     for cell in ws[1]:
         cell.font = header_font
-    for row in _bulk_rows(outcomes):
+    for row in rows:
         ws.append(row)
     ws.freeze_panes = "A2"
     ws.auto_filter.ref = ws.dimensions
-    # readable default widths for the long-text columns
-    widths = {"A": 22, "B": 18, "C": 13, "E": 60, "G": 40, "H": 40, "I": 40,
-              "J": 50, "K": 50, "L": 50, "P": 70, "R": 50, "T": 60, "U": 60}
+    widths = {"A": 22, "B": 16, "C": 12, "D": 45, "E": 45, "F": 45, "G": 45,
+              "I": 35, "J": 35, "K": 35, "L": 40, "M": 40, "N": 40, "O": 40,
+              "P": 40, "Q": 40, "S": 55, "T": 55, "V": 45, "W": 45}
     for col, w in widths.items():
         ws.column_dimensions[col].width = w
     wb.save(path)
@@ -600,12 +638,13 @@ def write_outputs(
 
     reviewable = [o for o in outcomes if o.status in ("ok", "needs_review", "failed")]
 
+    bulk = _bulk_rows(reviewable)
     _write_upload_xlsx(parse, ok_outcomes, upload_path)
     _write_results_json(parse, outcomes, run_id, results_path)
     _write_report_html(parse, outcomes, run_id, report_path)
     _write_input_issues_json(outcomes, input_issues_path)
-    _write_results_csv(reviewable, csv_path)
-    _write_results_xlsx(reviewable, run_id, xlsx_path)
+    _write_results_csv_rows(bulk, csv_path)
+    _write_results_xlsx_rows(bulk, xlsx_path)
 
     return {
         "upload.xlsx": str(upload_path),

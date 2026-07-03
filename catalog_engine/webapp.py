@@ -296,6 +296,64 @@ def download(seller_id: str, run_id: str, name: str):
 
 
 # ---------------------------------------------------------------------------
+# Dashboard rows (before/after/corrections) + export rebuild
+# ---------------------------------------------------------------------------
+_PARSE_CACHE: dict[str, Any] = {}  # source_file -> ParseResult
+
+
+def _cached_parse(source_file: str, seller_id: str):
+    from .parser import parse_flat_file
+
+    parse = _PARSE_CACHE.get(source_file)
+    if parse is None:
+        if not Path(source_file).exists():
+            raise HTTPException(
+                410, "the original report file for this run is no longer on "
+                     "disk, so originals cannot be shown — re-upload it")
+        parse = parse_flat_file(source_file, seller_id=seller_id)
+        _PARSE_CACHE.clear()  # keep at most one big workbook in memory
+        _PARSE_CACHE[source_file] = parse
+    return parse
+
+
+@router.get("/api/sellers/{seller_id}/runs/{run_id}/rows")
+def dashboard_rows(seller_id: str, run_id: str) -> dict[str, Any]:
+    """Before/after/corrections per SKU for the in-page dashboard."""
+    from .output import _BULK_HEADER, build_bulk_rows_from_results
+
+    _check_id(seller_id, "seller_id")
+    store = _store()
+    try:
+        results = _load_results(store, seller_id, run_id)
+        parse = _cached_parse(results["source_file"], seller_id)
+        return {"header": _BULK_HEADER,
+                "rows": build_bulk_rows_from_results(parse, results)}
+    finally:
+        store.close()
+
+
+@router.post("/api/sellers/{seller_id}/runs/{run_id}/rebuild-exports")
+def rebuild_exports(seller_id: str, run_id: str) -> dict[str, Any]:
+    """Regenerate results.csv/results.xlsx for a run with the current export
+    format (before/after columns). Safe to call repeatedly."""
+    from .output import (_write_results_csv_rows, _write_results_xlsx_rows,
+                         build_bulk_rows_from_results)
+
+    _check_id(seller_id, "seller_id")
+    store = _store()
+    try:
+        results = _load_results(store, seller_id, run_id)
+        parse = _cached_parse(results["source_file"], seller_id)
+        rows = build_bulk_rows_from_results(parse, results)
+        d = _run_dir(store, seller_id, run_id)
+        _write_results_csv_rows(rows, d / "results.csv")
+        _write_results_xlsx_rows(rows, d / "results.xlsx")
+        return {"ok": True, "rows": len(rows)}
+    finally:
+        store.close()
+
+
+# ---------------------------------------------------------------------------
 # Review: flagged SKUs, approve, merge
 # ---------------------------------------------------------------------------
 def _load_results(store: Store, seller_id: str, run_id: str) -> dict:
