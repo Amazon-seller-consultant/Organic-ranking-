@@ -13,6 +13,7 @@ import hashlib
 import json
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -78,6 +79,7 @@ def run_pipeline(
     limit: Optional[int] = None,
     force: bool = False,
     refresh_rules: bool = False,
+    workers: int = 1,
     progress: Callable[[str], None] = lambda msg: print(msg, file=sys.stderr),
 ) -> RunSummary:
     from .parser import parse_flat_file  # local import keeps module load light
@@ -148,24 +150,31 @@ def run_pipeline(
              f"with {config.generation_model} ...")
 
     # ---- 3. GENERATE + 4. VERIFY ------------------------------------------
+    # Workers only make API calls and run the (pure) validator; every SQLite
+    # write happens on this thread as futures complete — the sqlite3
+    # connection is not shared across threads.
     client = generator.make_client()
     t0 = time.time()
-    for i, rec in enumerate(work, 1):
-        progress(f"    [{i}/{len(work)}] {rec.sku} ({rec.product_type})")
+    workers = max(1, min(workers, 16))
+
+    def process(rec: ProductRecord):
+        gen = generator.generate_for_record(client, rec, config, run_id, store=None)
+        return validator.verify_generated(rec, gen, config, run_id)
+
+    def finish(rec: ProductRecord, i: int, result=None, exc=None) -> None:
         base_issues = issues_by_sku.get(rec.sku, [])
-        try:
-            gen = generator.generate_for_record(client, rec, config, run_id, store)
-        except GenerationError as exc:
+        if exc is not None:
+            progress(f"    [{i}/{len(work)}] {rec.sku} ({rec.product_type}) FAILED: {exc}")
             outcomes.append(SkuOutcome(
                 record=rec, generated=None, issues=base_issues + [Issue(
                     sku=rec.sku, field_name="generation", rule="generation_failed",
                     severity=Severity.ERROR, message=str(exc))],
                 status="failed", skip_reason=str(exc)))
-            continue
-
-        verified, ver_issues, log_entries = validator.verify_generated(
-            rec, gen, config, run_id
-        )
+            return
+        verified, ver_issues, log_entries = result
+        store.record_usage(
+            seller_id, run_id, rec.sku, config.generation_model,
+            verified.input_tokens, verified.output_tokens)
         for entry in log_entries:
             store.log_compliance(entry)
         has_error = any(i.severity is Severity.ERROR for i in ver_issues)
@@ -175,6 +184,26 @@ def run_pipeline(
             status="needs_review" if has_error else "ok"))
         if not has_error:
             store.set_fingerprint(seller_id, rec.sku, fingerprint(rec))
+        progress(f"    [{i}/{len(work)}] {rec.sku} ({rec.product_type}) "
+                 f"{'needs_review' if has_error else 'ok'}")
+
+    if workers == 1:
+        for i, rec in enumerate(work, 1):
+            try:
+                finish(rec, i, result=process(rec))
+            except GenerationError as exc:
+                finish(rec, i, exc=exc)
+    else:
+        done = 0
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(process, rec): rec for rec in work}
+            for fut in as_completed(futures):
+                rec = futures[fut]
+                done += 1
+                try:
+                    finish(rec, done, result=fut.result())
+                except GenerationError as exc:
+                    finish(rec, done, exc=exc)
 
     elapsed = time.time() - t0
     n_ok = sum(1 for o in outcomes if o.status == "ok")

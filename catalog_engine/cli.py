@@ -47,6 +47,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="reprocess SKUs even if source data is unchanged")
     rp.add_argument("--refresh-rules", action="store_true",
                     help="re-extract category rules, bypassing the cache")
+    rp.add_argument("--workers", type=int, default=8,
+                    help="concurrent generation requests (1-16, default 8)")
 
     up = sub.add_parser("usage", help="show per-seller LLM usage")
     up.add_argument("--seller", required=True)
@@ -67,7 +69,7 @@ def main(argv: list[str] | None = None) -> int:
             s = run_pipeline(
                 seller_id=args.seller, file_path=args.file, store=store,
                 pilot=args.pilot, limit=args.limit, force=args.force,
-                refresh_rules=args.refresh_rules,
+                refresh_rules=args.refresh_rules, workers=args.workers,
             )
             print(f"\nrun {s.run_id} complete")
             print(f"  rows: {s.total_rows}  generated: {s.generated}  "

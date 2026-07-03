@@ -58,7 +58,10 @@ HARD RULES
 1. Use ONLY facts present in the source data. Never invent, upgrade, or
    assume an attribute (no materials, dimensions, quantities, colors,
    certifications, or capabilities that are not in the data). If the data is
-   thin, write thinner copy — do not fill gaps.
+   thin, write thinner copy — do not fill gaps. Appearance words especially:
+   never call a product "clear", "transparent", a color, a material, or a
+   finish unless that exact word (or its listed synonym) appears in the
+   source data — even when it seems physically obvious for the product type.
 2. No medical claims (cure, treat, antibacterial, kills germs, sanitize...),
    no pesticide claims, no safety certifications not in the data, no
    promotional language (best seller, #1, free shipping, guarantee, sale,
@@ -217,7 +220,7 @@ def generate_for_record(
     try:
         response = client.messages.create(
             model=config.generation_model,
-            max_tokens=3000,
+            max_tokens=6000,
             thinking={"type": "adaptive"},
             output_config={
                 "effort": "medium",
@@ -236,13 +239,16 @@ def generate_for_record(
     except anthropic.APIConnectionError as exc:
         raise GenerationError(record.sku, f"connection error: {exc}") from exc
 
+    total_input = (
+        response.usage.input_tokens
+        + (response.usage.cache_creation_input_tokens or 0)
+        + (response.usage.cache_read_input_tokens or 0)
+    )
     if store is not None:
         store.record_usage(
             seller_id=config.seller_id, run_id=run_id, sku=record.sku,
             model=config.generation_model,
-            input_tokens=response.usage.input_tokens
-            + (response.usage.cache_creation_input_tokens or 0)
-            + (response.usage.cache_read_input_tokens or 0),
+            input_tokens=total_input,
             output_tokens=response.usage.output_tokens,
         )
 
@@ -265,6 +271,6 @@ def generate_for_record(
         description=str(data.get("description", "")).strip(),
         search_terms=str(data.get("search_terms", "")).strip(),
         model=config.generation_model,
-        input_tokens=response.usage.input_tokens,
+        input_tokens=total_input,  # includes cache read/creation tokens
         output_tokens=response.usage.output_tokens,
     )

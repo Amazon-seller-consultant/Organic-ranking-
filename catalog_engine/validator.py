@@ -82,7 +82,7 @@ MATERIAL_WORDS = (
 )
 
 # spelling variants normalized before haystack lookups (both directions)
-_WORD_EQUIV = {"grey": "gray", "aluminium": "aluminum"}
+_WORD_EQUIV = {"grey": "gray", "aluminium": "aluminum", "transparent": "clear"}
 
 _NUM = r"\d+(?:\.\d+)?"
 _DIM_PAIR_RE = re.compile(r"\b(%s)\s*[x×]\s*(%s)\b" % (_NUM, _NUM), re.IGNORECASE)
