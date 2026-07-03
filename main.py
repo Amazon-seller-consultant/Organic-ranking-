@@ -3168,4 +3168,7 @@ async def save_export_to_downloads(filename: str):
     }
 
 
+from catalog_engine.webapp import router as catalog_router
+app.include_router(catalog_router)
+
 app.mount("/static", StaticFiles(directory="static"), name="static")

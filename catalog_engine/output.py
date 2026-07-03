@@ -242,6 +242,42 @@ def _write_input_issues_json(outcomes: list[SkuOutcome], path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Subset/merged upload files (approve-flagged flow + multi-run merge)
+# ---------------------------------------------------------------------------
+def write_upload_subset(
+    parse: ParseResult,
+    sku_generated: list[tuple[str, dict[str, Any]]],  # (sku, generated dict)
+    path: Path,
+) -> int:
+    """Write an upload flat file for an arbitrary set of SKUs whose generated
+    content comes from a run's results.json. Used for approving flagged SKUs
+    after human review and for merging several runs into one upload file.
+    Returns the number of rows written."""
+    from .models import GeneratedContent
+
+    by_sku = parse.by_sku()
+    outcomes: list[SkuOutcome] = []
+    for sku, gen in sku_generated:
+        rec = by_sku.get(sku)
+        if rec is None or not gen:
+            continue
+        outcomes.append(SkuOutcome(
+            record=rec,
+            generated=GeneratedContent(
+                sku=sku,
+                title=gen.get("title", ""),
+                item_highlights=list(gen.get("item_highlights", [])),
+                bullets=list(gen.get("bullets", [])),
+                description=gen.get("description", ""),
+                search_terms=gen.get("search_terms", ""),
+            ),
+            status="ok",
+        ))
+    _write_upload_xlsx(parse, outcomes, path)
+    return len(outcomes)
+
+
+# ---------------------------------------------------------------------------
 # Bulk exports: results.csv + results.xlsx (all generated content, one row
 # per SKU, ready for review in Excel/Sheets or downstream tooling)
 # ---------------------------------------------------------------------------

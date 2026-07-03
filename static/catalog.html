@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Catalog Optimizer</title>
+<style>
+* { box-sizing: border-box; }
+body { font-family: -apple-system,'Segoe UI',Helvetica,Arial,sans-serif;
+  margin: 0; min-height: 100vh; color: rgba(255,255,255,.88);
+  background: linear-gradient(135deg,#0f0c29 0%,#302b63 55%,#24243e 100%) fixed; }
+.wrap { max-width: 1080px; margin: 0 auto; padding: 32px 20px 80px; }
+h1 { font-size: 24px; font-weight: 600; color: #fff; margin: 0; }
+.sub { color: rgba(255,255,255,.5); font-size: 13px; margin: 4px 0 24px; }
+.glass { background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14);
+  border-radius: 16px; padding: 20px; margin: 0 0 18px;
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 8px 32px rgba(3,0,26,.35); }
+.glass h2 { font-size: 15px; font-weight: 600; color: #fff; margin: 0 0 12px;
+  letter-spacing: .3px; }
+label { font-size: 12px; color: rgba(255,255,255,.55); display: block; margin: 0 0 4px; }
+input, select, button, textarea { font: inherit; color: #fff; border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.07);
+  padding: 8px 12px; outline: none; }
+input:focus, select:focus, textarea:focus { border-color: rgba(165,180,252,.6); }
+select option { color: #111; }
+button { cursor: pointer; font-weight: 600; transition: all .15s; }
+button:hover { background: rgba(255,255,255,.14); }
+button.primary { background: linear-gradient(90deg,#6366f1,#8b5cf6); border: none; }
+button.primary:hover { filter: brightness(1.15); }
+button.go { background: linear-gradient(90deg,#34d399,#22d3ee); color: #052e2b;
+  border: none; }
+button:disabled { opacity: .4; cursor: default; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+.grow { flex: 1; min-width: 140px; }
+.pill { display: inline-block; padding: 3px 12px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; margin: 0 6px 6px 0;
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); }
+.pill.ok { background: rgba(52,211,153,.14); border-color: rgba(52,211,153,.4); color: #6ee7b7; }
+.pill.warn { background: rgba(251,191,36,.14); border-color: rgba(251,191,36,.4); color: #fcd34d; }
+.pill.bad { background: rgba(248,113,113,.14); border-color: rgba(248,113,113,.4); color: #fca5a5; }
+.drop { border: 2px dashed rgba(255,255,255,.25); border-radius: 14px;
+  padding: 28px; text-align: center; color: rgba(255,255,255,.55);
+  font-size: 14px; transition: all .2s; cursor: pointer; }
+.drop.over { border-color: #22d3ee; background: rgba(34,211,238,.08); color: #67e8f9; }
+#log { font-family: ui-monospace, Menlo, monospace; font-size: 12px;
+  background: rgba(0,0,0,.35); border-radius: 10px; padding: 12px;
+  max-height: 240px; overflow-y: auto; white-space: pre-wrap;
+  color: rgba(255,255,255,.75); display: none; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 8px 10px;
+  border-bottom: 1px solid rgba(255,255,255,.08); vertical-align: top; }
+th { color: rgba(255,255,255,.5); font-size: 11px; text-transform: uppercase;
+  letter-spacing: .5px; }
+a.art { color: #93c5fd; text-decoration: none; margin-right: 10px; font-size: 12px;
+  white-space: nowrap; }
+a.art:hover { text-decoration: underline; }
+.flag { background: rgba(255,255,255,.04); border: 1px solid rgba(251,191,36,.25);
+  border-radius: 12px; padding: 12px 14px; margin: 0 0 10px; }
+.flag .sku { font-weight: 600; color: #fff; }
+.flag .why { color: #fcd34d; font-size: 12px; margin: 4px 0; }
+.flag .txt { color: rgba(255,255,255,.7); font-size: 12px; }
+.muted { color: rgba(255,255,255,.45); font-size: 12px; }
+.termpill { display: inline-flex; gap: 6px; align-items: center; padding: 3px 10px;
+  border-radius: 999px; background: rgba(165,180,252,.12);
+  border: 1px solid rgba(165,180,252,.35); color: #c7d2fe; font-size: 12px;
+  margin: 0 6px 6px 0; }
+.termpill b { cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Catalog Optimizer</h1>
+  <div class="sub">Amazon Category Listing Report → compliant, optimized content. Review before upload — nothing publishes automatically.</div>
+
+  <div class="glass">
+    <h2>Seller</h2>
+    <div class="row">
+      <div><label>Active seller</label><select id="seller" onchange="switchSeller()"></select></div>
+      <div class="grow"><label>New seller id</label><input id="newSellerId" placeholder="acme-displays"></div>
+      <div><label>Marketplace</label><select id="newMp"><option>US</option><option>UK</option><option>EU</option><option>CA</option></select></div>
+      <div><label>On limit violation</label><select id="newLimit"><option value="auto_trim">auto-trim</option><option value="flag">flag for review</option></select></div>
+      <button class="primary" onclick="createSeller()">Add seller</button>
+    </div>
+    <div style="margin-top:14px">
+      <label>Attested facts (seller-confirmed vocabulary, audit-logged)</label>
+      <div id="terms"></div>
+      <div class="row" style="margin-top:6px">
+        <div><input id="attTerm" placeholder="term e.g. clear" style="width:140px"></div>
+        <div class="grow"><input id="attNote" placeholder="attestation note e.g. signage panels are clear acrylic" style="width:100%"></div>
+        <button onclick="addTerm()">Attest</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="glass">
+    <h2>Run</h2>
+    <div class="drop" id="drop" onclick="document.getElementById('file').click()">
+      Drop the Category Listing Report (.xlsm) here, or click to choose
+      <input type="file" id="file" accept=".xlsm,.xlsx" style="display:none" onchange="uploadFile(this.files[0])">
+    </div>
+    <div class="row" style="margin-top:12px">
+      <div class="grow"><label>Report file</label><select id="uploads"></select></div>
+      <div><label>Mode</label><select id="mode">
+        <option value="">Full catalog (changed SKUs only)</option>
+        <option value="pilot">Pilot — one SKU per product type</option>
+        <option value="force">Force — regenerate everything</option>
+      </select></div>
+      <div><label>Workers</label><input id="workers" type="number" min="1" max="16" value="8" style="width:70px"></div>
+      <button class="go" id="runBtn" onclick="startRun()">Start run</button>
+    </div>
+    <div id="log" style="margin-top:12px"></div>
+    <div id="runStats" style="margin-top:10px"></div>
+  </div>
+
+  <div class="glass">
+    <h2>Needs review</h2>
+    <div class="muted" id="flagNote">Pick a run below to load its flagged SKUs.</div>
+    <div id="flags"></div>
+    <div class="row" style="margin-top:8px">
+      <button class="primary" id="approveBtn" style="display:none" onclick="approveChecked()">Approve checked → approved_upload.xlsx</button>
+    </div>
+  </div>
+
+  <div class="glass">
+    <h2>Runs &amp; downloads</h2>
+    <div class="row" style="margin-bottom:10px">
+      <button onclick="refreshRuns()">Refresh</button>
+      <button class="primary" onclick="mergeChecked()">Merge checked runs → one upload file</button>
+    </div>
+    <table id="runsTable"><thead><tr>
+      <th></th><th>Run</th><th>Result</th><th>Artifacts</th>
+    </tr></thead><tbody></tbody></table>
+  </div>
+</div>
+
+<script>
+const api = (p, opts) => fetch('/catalog/api' + p, opts).then(async r => {
+  if (!r.ok) { const t = await r.json().catch(()=>({detail:r.statusText}));
+    throw new Error(t.detail || r.statusText); }
+  return r.json();
+});
+const $ = id => document.getElementById(id);
+let sellers = [], activeSeller = null, reviewRun = null;
+
+async function boot() {
+  sellers = await api('/sellers');
+  const sel = $('seller');
+  sel.innerHTML = sellers.map(s => `<option value="${s.seller_id}">${s.seller_id}</option>`).join('');
+  if (sellers.length) { activeSeller = sellers[0].seller_id; sel.value = activeSeller; }
+  await switchSeller();
+}
+async function switchSeller() {
+  activeSeller = $('seller').value || null;
+  if (!activeSeller) return;
+  renderTerms();
+  await Promise.all([refreshUploads(), refreshRuns()]);
+  $('flags').innerHTML = ''; $('approveBtn').style.display = 'none';
+  $('flagNote').style.display = '';
+}
+function cfg() { return sellers.find(s => s.seller_id === activeSeller) || {}; }
+function renderTerms() {
+  const t = cfg().attested_terms || {};
+  $('terms').innerHTML = Object.entries(t).map(([k,v]) =>
+    `<span class="termpill" title="${v.replace(/"/g,'&quot;')}">${k} <b onclick="removeTerm('${k}')">✕</b></span>`
+  ).join('') || '<span class="muted">none yet</span>';
+}
+async function createSeller() {
+  const id = $('newSellerId').value.trim();
+  if (!id) return alert('enter a seller id');
+  await api('/sellers', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({seller_id:id, marketplace:$('newMp').value,
+      on_limit_violation:$('newLimit').value})});
+  $('newSellerId').value = ''; await boot(); $('seller').value = id; await switchSeller();
+}
+async function addTerm() {
+  const term = $('attTerm').value.trim(), note = $('attNote').value.trim();
+  if (!term || !note) return alert('term and note are both required — the note is the audit record');
+  const r = await api(`/sellers/${activeSeller}/attest`, {method:'POST',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify({term, note})});
+  cfg().attested_terms = r.attested_terms; renderTerms();
+  $('attTerm').value=''; $('attNote').value='';
+}
+async function removeTerm(term) {
+  const r = await api(`/sellers/${activeSeller}/attest`, {method:'POST',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify({term, remove:true})});
+  cfg().attested_terms = r.attested_terms; renderTerms();
+}
+
+const drop = $('drop');
+['dragover','dragenter'].forEach(e => drop.addEventListener(e, ev => {ev.preventDefault(); drop.classList.add('over');}));
+['dragleave','drop'].forEach(e => drop.addEventListener(e, ev => {ev.preventDefault(); drop.classList.remove('over');}));
+drop.addEventListener('drop', ev => { const f = ev.dataTransfer.files[0]; if (f) uploadFile(f); });
+
+async function uploadFile(f) {
+  if (!f || !activeSeller) return;
+  drop.textContent = 'Uploading ' + f.name + ' ...';
+  const fd = new FormData(); fd.append('file', f);
+  try {
+    await fetch(`/catalog/api/sellers/${activeSeller}/upload`, {method:'POST', body: fd})
+      .then(async r => { if (!r.ok) throw new Error((await r.json()).detail); });
+    drop.textContent = f.name + ' uploaded ✓ — drop another, or start the run';
+    await refreshUploads();
+  } catch (e) { drop.textContent = 'Upload failed: ' + e.message; }
+}
+async function refreshUploads() {
+  const files = await api(`/sellers/${activeSeller}/uploads`);
+  $('uploads').innerHTML = files.map(f => `<option>${f.filename}</option>`).join('')
+    || '<option value="">— upload a report first —</option>';
+}
+
+let pollTimer = null;
+async function startRun() {
+  const filename = $('uploads').value;
+  if (!filename) return alert('upload a Category Listing Report first');
+  const mode = $('mode').value;
+  $('runBtn').disabled = true; $('log').style.display = 'block';
+  $('log').textContent = 'starting...'; $('runStats').innerHTML = '';
+  const body = {filename, workers: +$('workers').value,
+    pilot: mode === 'pilot', force: mode === 'force'};
+  try {
+    const {ticket} = await api(`/sellers/${activeSeller}/runs`, {method:'POST',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    pollTimer = setInterval(() => poll(ticket), 1500);
+  } catch (e) { $('log').textContent = 'error: ' + e.message; $('runBtn').disabled = false; }
+}
+async function poll(ticket) {
+  const p = await api('/progress/' + ticket);
+  const el = $('log');
+  el.textContent = p.lines.slice(-200).join('\n');
+  el.scrollTop = el.scrollHeight;
+  if (p.done) {
+    clearInterval(pollTimer); $('runBtn').disabled = false;
+    if (p.error) { el.textContent += '\n\nERROR: ' + p.error; return; }
+    const s = p.summary;
+    $('runStats').innerHTML =
+      `<span class="pill ok">${s.generated - s.needs_review} upload-ready</span>` +
+      `<span class="pill warn">${s.needs_review} needs review</span>` +
+      `<span class="pill ${s.failed ? 'bad' : ''}">${s.failed} failed</span>` +
+      `<span class="pill">${s.skipped_unchanged} unchanged (skipped)</span>`;
+    await refreshRuns();
+    if (s.needs_review > 0 && p.run_id) loadFlags(p.run_id);
+  }
+}
+
+async function refreshRuns() {
+  const runs = await api(`/sellers/${activeSeller}/runs`);
+  const tb = $('runsTable').querySelector('tbody');
+  tb.innerHTML = '';
+  for (const r of runs) {
+    const s = r.summary || {};
+    const arts = await api(`/sellers/${activeSeller}/runs/${r.run_id}/artifacts`).catch(()=>[]);
+    const links = arts.map(a =>
+      `<a class="art" href="/catalog/api/sellers/${activeSeller}/runs/${r.run_id}/file/${a}" target="_blank">${a}</a>`).join('');
+    const result = r.finished_at
+      ? `${(s.generated ?? 0) - (s.needs_review ?? 0)} ok · ` +
+        `<a class="art" href="#" onclick="loadFlags('${r.run_id}');return false">${s.needs_review ?? 0} review</a>` +
+        ` · ${s.failed ?? 0} failed`
+      : 'running…';
+    tb.insertAdjacentHTML('beforeend',
+      `<tr><td><input type="checkbox" class="runck" value="${r.run_id}"></td>` +
+      `<td><div>${r.run_id}</div><div class="muted">${(r.source_file||'').split('/').pop()}</div></td>` +
+      `<td>${result}</td><td>${links}</td></tr>`);
+  }
+}
+
+async function loadFlags(runId) {
+  reviewRun = runId;
+  const flags = await api(`/sellers/${activeSeller}/runs/${runId}/flagged`);
+  $('flagNote').style.display = 'none';
+  $('flags').innerHTML = flags.length ? flags.map(f => `
+    <div class="flag">
+      <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer">
+        <input type="checkbox" class="flagck" value="${f.sku}" style="margin-top:3px">
+        <div>
+          <div class="sku">${f.sku} <span class="muted">${f.product_type}</span></div>
+          <div class="why">${f.issues.join('<br>')}</div>
+          <div class="txt">${(f.generated?.title)||''}</div>
+        </div>
+      </label>
+    </div>`).join('')
+    : '<div class="muted">No flagged SKUs in this run.</div>';
+  $('approveBtn').style.display = flags.length ? '' : 'none';
+}
+async function approveChecked() {
+  const skus = [...document.querySelectorAll('.flagck:checked')].map(c => c.value);
+  if (!skus.length) return alert('check the SKUs you have reviewed and approve');
+  if (!confirm(`Approve ${skus.length} SKU(s)? This writes approved_upload.xlsx and records your approval in the audit log.`)) return;
+  const r = await api(`/sellers/${activeSeller}/runs/${reviewRun}/approve`, {method:'POST',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify({skus})});
+  alert(`${r.written} SKU(s) written to approved_upload.xlsx`);
+  await refreshRuns(); await loadFlags(reviewRun);
+}
+async function mergeChecked() {
+  const ids = [...document.querySelectorAll('.runck:checked')].map(c => c.value);
+  if (ids.length < 1) return alert('check the runs to merge');
+  const r = await api(`/sellers/${activeSeller}/merged-upload`, {method:'POST',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify({run_ids: ids})});
+  alert(`${r.written} SKUs merged into merged_upload.xlsx (run ${r.run_id})`);
+  await refreshRuns();
+}
+boot();
+</script>
+</body>
+</html>

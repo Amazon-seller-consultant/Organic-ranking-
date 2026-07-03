@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "app",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "uvicorn", "main:app", "--port", "8000", "--loop", "asyncio", "--http", "h11"],
+      "port": 8000
+    }
+  ]
+}

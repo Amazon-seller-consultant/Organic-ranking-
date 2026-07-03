@@ -121,6 +121,21 @@ class Store:
         self._conn.commit()
         return run_id
 
+    def list_runs(self, seller_id: str, limit: int = 50) -> list[dict[str, Any]]:
+        rows = self._conn.execute(
+            "SELECT run_id, source_file, started_at, finished_at, summary_json "
+            "FROM runs WHERE seller_id=? ORDER BY started_at DESC LIMIT ?",
+            (seller_id, limit),
+        ).fetchall()
+        return [
+            {
+                "run_id": r[0], "source_file": r[1], "started_at": r[2],
+                "finished_at": r[3],
+                "summary": json.loads(r[4]) if r[4] else None,
+            }
+            for r in rows
+        ]
+
     def finish_run(self, run_id: str, summary: dict[str, Any]) -> None:
         self._conn.execute(
             "UPDATE runs SET finished_at=?, summary_json=? WHERE run_id=?",
