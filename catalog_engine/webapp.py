@@ -253,7 +253,8 @@ def list_runs(seller_id: str) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 _ARTIFACT_NAMES = {"upload.xlsx", "results.json", "results.csv", "results.xlsx",
                    "report.html", "input_issues.json", "approved_upload.xlsx",
-                   "merged_upload.xlsx"}
+                   "merged_upload.xlsx", "catalog_results.xlsx",
+                   "catalog_results.csv", "catalog_upload.xlsx"}
 
 
 def _run_dir(store: Store, seller_id: str, run_id: str) -> Path:
@@ -337,6 +338,101 @@ def dashboard_rows(seller_id: str, run_id: str) -> dict[str, Any]:
                    "rows": build_bulk_rows_from_results(parse, results)}
         _dump_json(payload, cached)
         return payload
+    finally:
+        store.close()
+
+
+def _rows_for_run(store: Store, seller_id: str, run_id: str) -> list[list[Any]]:
+    """rows.json if present; otherwise rebuild once from results.json and
+    cache to disk. Returns [] when the run has no content or no source."""
+    from .output import _BULK_HEADER, _dump_json, build_bulk_rows_from_results
+
+    d = store.seller_dir(seller_id) / "outputs" / run_id
+    cached = d / "rows.json"
+    if cached.exists():
+        return json.loads(cached.read_text(encoding="utf-8"))["rows"]
+    rp = d / "results.json"
+    if not rp.exists():
+        return []
+    results = json.loads(rp.read_text(encoding="utf-8"))
+    if not any(s["status"] in ("ok", "needs_review", "failed")
+               for s in results["skus"]):
+        return []
+    try:
+        parse = _cached_parse(results["source_file"], seller_id)
+    except HTTPException:
+        return []  # source workbook gone — this run's originals unavailable
+    rows = build_bulk_rows_from_results(parse, results)
+    _dump_json({"header": _BULK_HEADER, "rows": rows}, cached)
+    return rows
+
+
+@router.get("/api/sellers/{seller_id}/catalog")
+def catalog_view(seller_id: str) -> dict[str, Any]:
+    """The seller's current catalog state for the newest uploaded report:
+    every run's rows merged (newest run wins per SKU), restricted to SKUs
+    that exist in that report. Also refreshes the consolidated artifacts
+    (catalog_results.xlsx/csv + catalog_upload.xlsx) in the newest run dir."""
+    from .output import (_BULK_HEADER, _write_results_csv_rows,
+                         _write_results_xlsx_rows, write_upload_subset)
+
+    _check_id(seller_id, "seller_id")
+    store = _store()
+    try:
+        runs = [r for r in store.list_runs(seller_id) if r["finished_at"]]
+        newest = None
+        for r in runs:  # list_runs is newest-first
+            if (store.seller_dir(seller_id) / "outputs" / r["run_id"]
+                    / "results.json").exists():
+                newest = r
+                break
+        if newest is None:
+            raise HTTPException(404, "no finished runs yet")
+        results = _load_results(store, seller_id, newest["run_id"])
+        parse = _cached_parse(results["source_file"], seller_id)
+        valid = set(parse.by_sku())
+
+        merged: dict[str, list[Any]] = {}
+        used = 0
+        for r in reversed(runs):  # oldest -> newest so newest wins
+            rows = _rows_for_run(store, seller_id, r["run_id"])
+            hit = False
+            for row in rows:
+                if row[0] in valid:
+                    merged[row[0]] = row
+                    hit = True
+            used += 1 if hit else 0
+        all_rows = sorted(merged.values(), key=lambda r: r[0])
+
+        d = store.seller_dir(seller_id) / "outputs" / newest["run_id"]
+        _write_results_xlsx_rows(all_rows, d / "catalog_results.xlsx")
+        _write_results_csv_rows(all_rows, d / "catalog_results.csv")
+        ok_pairs = [
+            (r[0], {"title": r[6],
+                    "item_highlights": [h for h in (r[8], r[9], r[10]) if h],
+                    "bullets": [b for b in (r[12], r[14], r[16]) if b],
+                    "description": r[19], "search_terms": r[22]})
+            for r in all_rows if r[2] == "ok"
+        ]
+        n_upload = write_upload_subset(parse, ok_pairs, d / "catalog_upload.xlsx")
+
+        report_run = next(
+            (r["run_id"] for r in runs
+             if (store.seller_dir(seller_id) / "outputs" / r["run_id"]
+                 / "report.html").exists()), None)
+        review_run = next(
+            (r["run_id"] for r in runs
+             if ((r.get("summary") or {}).get("needs_review") or 0) > 0), None)
+        return {
+            "run_id": newest["run_id"],
+            "source": Path(results["source_file"]).name,
+            "runs_used": used,
+            "upload_skus": n_upload,
+            "report_run": report_run,
+            "review_run": review_run,
+            "header": _BULK_HEADER,
+            "rows": all_rows,
+        }
     finally:
         store.close()
 

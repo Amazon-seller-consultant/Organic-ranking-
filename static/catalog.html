@@ -303,23 +303,6 @@ async function poll(ticket) {
   }
 }
 
-const DL3 = [
-  ["results.xlsx", "Optimized content (Excel)", "originals + corrections + review, one file", "big"],
-  ["__upload__",   "Amazon upload file",        "ready for Seller Central",                  "violet"],
-  ["report.html",  "Review report",             "printable before/after",                    ""],
-];
-function threeButtons(runId, arts) {
-  const uploadArt = ["merged_upload.xlsx","approved_upload.xlsx","upload.xlsx"].find(a => arts.includes(a));
-  return DL3.map(([art, label, sub, cls]) => {
-    const a = art === "__upload__" ? uploadArt : (arts.includes(art) ? art : null);
-    if (!a) return '';
-    return `<a class="dl ${cls}" href="/catalog/api/sellers/${activeSeller}/runs/${runId}/file/${a}" target="_blank">
-      <span>${label}<small>${sub}</small></span></a>`;
-  }).join('') +
-  (arts.includes("results.csv")
-    ? `<a class="art" style="display:inline-block;margin-top:4px" href="/catalog/api/sellers/${activeSeller}/runs/${runId}/file/results.csv" target="_blank">csv version</a>` : '');
-}
-
 async function refreshAll() {
   overviewData = await api(`/sellers/${activeSeller}/overview`);
   await refreshUploadsSelect();
@@ -337,36 +320,40 @@ async function refreshAll() {
       `<td><div>${r.run_id}</div><div class="muted">${esc((r.source_file||'').split('/').pop())}</div></td>` +
       `<td>${result}</td><td>${links}</td></tr>`;
   }).join('');
-  // dashboard shows the newest run that actually produced content; a run
-  // where everything was up to date already ("0 generated") is only noted
-  const newest = runs.find(r => r.finished_at);
-  const latest = runs.find(r => r.finished_at && (r.artifacts||[]).length
-                                && ((r.summary||{}).generated || 0) > 0);
-  if (latest) {
-    const s = latest.summary || {};
-    $('latest').style.display = '';
-    const note = (newest && newest.run_id !== latest.run_id)
-      ? ` — latest run found everything already optimized (${(newest.summary||{}).skipped_unchanged ?? 0} unchanged), showing last content run`
-      : '';
-    $('latestMeta').textContent = `run ${latest.run_id}${note}`;
-    $('latestPills').innerHTML =
-      `<span class="pill ok">${(s.generated ?? 0) - (s.needs_review ?? 0)} upload-ready</span>` +
-      `<span class="pill warn">${s.needs_review ?? 0} needs review</span>` +
-      `<span class="pill ${s.failed ? 'bad' : ''}">${s.failed ?? 0} failed</span>` +
-      `<span class="pill">${s.skipped_unchanged ?? 0} unchanged</span>`;
-    $('latestDl').innerHTML = threeButtons(latest.run_id, latest.artifacts);
-    loadFlags(latest.run_id);
-    loadDash(latest.run_id);
-  }
+  loadCatalog();
 }
 
-// ---- inline before/after browser ----------------------------------------
+// ---- catalog view: all runs merged, current file's SKUs ------------------
 let dashRows = [], dashShown = 50;
-async function loadDash(runId) {
-  $('dash').innerHTML = '<div class="muted">Loading…</div>';
+async function loadCatalog() {
+  $('dash').innerHTML = '<div class="muted">Loading catalog…</div>';
   try {
-    const d = await api(`/sellers/${activeSeller}/runs/${runId}/rows`);
-    dashRows = d.rows; dashShown = 50; renderDash();
+    const c = await api(`/sellers/${activeSeller}/catalog`);
+    dashRows = c.rows; dashShown = 50;
+    const nOk = c.rows.filter(r => r[2]==='ok').length;
+    const nRev = c.rows.filter(r => r[2]==='needs_review').length;
+    const nFail = c.rows.filter(r => r[2]==='failed').length;
+    $('latest').style.display = '';
+    $('latestMeta').textContent =
+      `${c.source} — complete catalog, merged from ${c.runs_used} run(s)`;
+    $('latestPills').innerHTML =
+      `<span class="pill ok">${nOk} upload-ready</span>` +
+      `<span class="pill warn">${nRev} needs review</span>` +
+      `<span class="pill ${nFail ? 'bad' : ''}">${nFail} failed</span>`;
+    const B = (art, runId, label, sub, cls) =>
+      `<a class="dl ${cls}" href="/catalog/api/sellers/${activeSeller}/runs/${runId}/file/${art}" target="_blank">
+        <span>${label}<small>${sub}</small></span></a>`;
+    $('latestDl').innerHTML =
+      B('catalog_results.xlsx', c.run_id, 'Optimized content (Excel)',
+        'originals + corrections + review, whole catalog', 'big') +
+      B('catalog_upload.xlsx', c.run_id, 'Amazon upload file',
+        `${c.upload_skus} approved SKUs, ready for Seller Central`, 'violet') +
+      (c.report_run ? B('report.html', c.report_run, 'Review report',
+        'printable before/after', '') : '') +
+      `<a class="art" style="display:inline-block;margin-top:4px" href="/catalog/api/sellers/${activeSeller}/runs/${c.run_id}/file/catalog_results.csv" target="_blank">csv version</a>`;
+    if (c.review_run) loadFlags(c.review_run);
+    else $('reviewCard').style.display = 'none';
+    renderDash();
   } catch (e) { $('dash').innerHTML = `<div class="muted">${esc(e.message)}</div>`; }
 }
 function baBlock(label, before, after, count) {
