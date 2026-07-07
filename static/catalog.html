@@ -337,12 +337,18 @@ async function refreshAll() {
       `<td><div>${r.run_id}</div><div class="muted">${esc((r.source_file||'').split('/').pop())}</div></td>` +
       `<td>${result}</td><td>${links}</td></tr>`;
   }).join('');
-  // latest finished run drives the dashboard
-  const latest = runs.find(r => r.finished_at && (r.artifacts||[]).length);
+  // dashboard shows the newest run that actually produced content; a run
+  // where everything was up to date already ("0 generated") is only noted
+  const newest = runs.find(r => r.finished_at);
+  const latest = runs.find(r => r.finished_at && (r.artifacts||[]).length
+                                && ((r.summary||{}).generated || 0) > 0);
   if (latest) {
     const s = latest.summary || {};
     $('latest').style.display = '';
-    $('latestMeta').textContent = `run ${latest.run_id}`;
+    const note = (newest && newest.run_id !== latest.run_id)
+      ? ` — latest run found everything already optimized (${(newest.summary||{}).skipped_unchanged ?? 0} unchanged), showing last content run`
+      : '';
+    $('latestMeta').textContent = `run ${latest.run_id}${note}`;
     $('latestPills').innerHTML =
       `<span class="pill ok">${(s.generated ?? 0) - (s.needs_review ?? 0)} upload-ready</span>` +
       `<span class="pill warn">${s.needs_review ?? 0} needs review</span>` +
