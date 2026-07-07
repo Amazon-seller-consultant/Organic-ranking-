@@ -12,6 +12,7 @@ import json
 import sqlite3
 import time
 import uuid
+import dataclasses
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Optional
@@ -103,7 +104,10 @@ class Store:
             raise SellerNotFoundError(
                 f"seller '{seller_id}' is not registered; create it first"
             )
-        return SellerConfig(**json.loads(row[0]))
+        data = json.loads(row[0])
+        # tolerate config saved by a newer/older code version
+        fields = {f.name for f in dataclasses.fields(SellerConfig)}
+        return SellerConfig(**{k: v for k, v in data.items() if k in fields})
 
     def seller_dir(self, seller_id: str) -> Path:
         d = self.data_dir / "sellers" / seller_id
