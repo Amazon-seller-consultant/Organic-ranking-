@@ -390,7 +390,12 @@ def catalog_view(seller_id: str) -> dict[str, Any]:
             raise HTTPException(404, "no finished runs yet")
         results = _load_results(store, seller_id, newest["run_id"])
         parse = _cached_parse(results["source_file"], seller_id)
-        valid = set(parse.by_sku())
+        # catalog view honors the seller's status scope (default: Active only)
+        cfg = store.get_seller(seller_id)
+        statuses = tuple(s.strip().lower()
+                         for s in (cfg.include_statuses or ["active"]))
+        valid = {rec.sku for rec in parse.records
+                 if rec.listing_status.strip().lower() in statuses}
 
         merged: dict[str, list[Any]] = {}
         used = 0
