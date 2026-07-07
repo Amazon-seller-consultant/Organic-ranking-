@@ -38,10 +38,14 @@ def fingerprint(record: ProductRecord) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def in_scope(record: ProductRecord) -> tuple[bool, str]:
-    if record.listing_status.lower() == "active":
+def in_scope(record: ProductRecord, include_statuses=("active",)) -> tuple[bool, str]:
+    status = record.listing_status.strip().lower()
+    if status in include_statuses:
         return True, ""
-    return False, f"listing_status is '{record.listing_status or 'blank'}', not Active"
+    return False, (
+        f"listing_status is '{record.listing_status or 'blank'}' — not in this "
+        f"seller's include_statuses {list(include_statuses)}"
+    )
 
 
 def select_pilot(records: list[ProductRecord]) -> list[ProductRecord]:
@@ -114,7 +118,8 @@ def run_pipeline(
     outcomes: list[SkuOutcome] = []
     work: list[ProductRecord] = []
     for rec in parse.records:
-        ok, why = in_scope(rec)
+        ok, why = in_scope(rec, tuple(
+            s.strip().lower() for s in (config.include_statuses or ["active"])))
         if not ok:
             outcomes.append(SkuOutcome(record=rec, generated=None,
                                        issues=issues_by_sku.get(rec.sku, []),

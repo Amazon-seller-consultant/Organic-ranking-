@@ -160,6 +160,10 @@ class SellerConfig:
     # data and records the attestation in the audit log. They are seller
     # input, never model inference.
     attested_terms: dict[str, str] = field(default_factory=dict)
+    # Listing statuses that receive generated content. Lowercased match on
+    # the ::listing_status cell; "" means blank-status rows (e.g. bundle
+    # listings some catalogs carry with no status letter).
+    include_statuses: list = field(default_factory=lambda: ["active"])
 
 
 # ---------------------------------------------------------------------------
