@@ -645,6 +645,8 @@ def write_outputs(
     _write_input_issues_json(outcomes, input_issues_path)
     _write_results_csv_rows(bulk, csv_path)
     _write_results_xlsx_rows(bulk, xlsx_path)
+    # precomputed dashboard rows — web UI loads this instead of re-parsing
+    _dump_json({"header": _BULK_HEADER, "rows": bulk}, out_dir / "rows.json")
 
     return {
         "upload.xlsx": str(upload_path),

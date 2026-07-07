@@ -11,13 +11,12 @@ body { font-family: -apple-system,'Segoe UI',Helvetica,Arial,sans-serif;
   background: linear-gradient(135deg,#0f0c29 0%,#302b63 55%,#24243e 100%) fixed; }
 .wrap { max-width: 1080px; margin: 0 auto; padding: 28px 20px 80px; }
 h1 { font-size: 24px; font-weight: 600; color: #fff; margin: 0; }
-.sub { color: rgba(255,255,255,.5); font-size: 13px; margin: 4px 0 20px; }
+.sub { color: rgba(255,255,255,.5); font-size: 13px; margin: 4px 0 16px; }
 .glass { background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14);
   border-radius: 16px; padding: 20px; margin: 0 0 18px;
   backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
   box-shadow: 0 8px 32px rgba(3,0,26,.35); }
-.glass h2 { font-size: 15px; font-weight: 600; color: #fff; margin: 0 0 12px;
-  letter-spacing: .3px; }
+.glass h2 { font-size: 15px; font-weight: 600; color: #fff; margin: 0 0 12px; letter-spacing: .3px; }
 label { font-size: 12px; color: rgba(255,255,255,.55); display: block; margin: 0 0 4px; }
 input, select, button, textarea { font: inherit; color: #fff; border-radius: 10px;
   border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.07);
@@ -28,7 +27,6 @@ button { cursor: pointer; font-weight: 600; transition: all .15s; }
 button:hover { background: rgba(255,255,255,.14); }
 button.primary { background: linear-gradient(90deg,#6366f1,#8b5cf6); border: none; }
 button.primary:hover { filter: brightness(1.15); }
-button.go { background: linear-gradient(90deg,#34d399,#22d3ee); color: #052e2b; border: none; }
 button.link { background: none; border: none; color: #93c5fd; font-weight: 400;
   font-size: 12px; padding: 4px 6px; }
 button:disabled { opacity: .4; cursor: default; }
@@ -40,7 +38,7 @@ button:disabled { opacity: .4; cursor: default; }
 .pill.ok { background: rgba(52,211,153,.14); border-color: rgba(52,211,153,.4); color: #6ee7b7; }
 .pill.warn { background: rgba(251,191,36,.14); border-color: rgba(251,191,36,.4); color: #fcd34d; }
 .pill.bad { background: rgba(248,113,113,.14); border-color: rgba(248,113,113,.4); color: #fca5a5; }
-.dl { display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px;
+.dl { display: inline-flex; align-items: center; gap: 8px; padding: 14px 20px;
   border-radius: 12px; margin: 0 10px 10px 0; text-decoration: none;
   font-size: 14px; font-weight: 600; color: #fff;
   background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.2);
@@ -48,14 +46,16 @@ button:disabled { opacity: .4; cursor: default; }
 .dl:hover { background: rgba(255,255,255,.16); }
 .dl.big { background: linear-gradient(90deg,#34d399,#22d3ee); color: #052e2b; border: none; }
 .dl.big:hover { filter: brightness(1.1); }
+.dl.violet { background: linear-gradient(90deg,#6366f1,#8b5cf6); border: none; }
 .dl small { display: block; font-weight: 400; font-size: 11px; opacity: .75; }
-.drop { border: 2px dashed rgba(255,255,255,.25); border-radius: 14px;
-  padding: 24px; text-align: center; color: rgba(255,255,255,.55);
-  font-size: 14px; transition: all .2s; cursor: pointer; }
+.drop { border: 2px dashed rgba(255,255,255,.3); border-radius: 14px;
+  padding: 34px; text-align: center; color: rgba(255,255,255,.65);
+  font-size: 15px; transition: all .2s; cursor: pointer; }
 .drop.over { border-color: #22d3ee; background: rgba(34,211,238,.08); color: #67e8f9; }
+.drop b { color: #fff; }
 #log { font-family: ui-monospace, Menlo, monospace; font-size: 12px;
   background: rgba(0,0,0,.35); border-radius: 10px; padding: 12px;
-  max-height: 220px; overflow-y: auto; white-space: pre-wrap;
+  max-height: 200px; overflow-y: auto; white-space: pre-wrap;
   color: rgba(255,255,255,.75); display: none; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { text-align: left; padding: 8px 10px;
@@ -68,15 +68,20 @@ a.art:hover { text-decoration: underline; }
 .flag .sku { font-weight: 600; color: #fff; }
 .flag .why { color: #fcd34d; font-size: 12px; margin: 4px 0; }
 .flag .txt { color: rgba(255,255,255,.7); font-size: 12px; }
+.why { color: #fcd34d; font-size: 12px; margin: 4px 0; }
 .muted { color: rgba(255,255,255,.45); font-size: 12px; }
 .termpill { display: inline-flex; gap: 6px; align-items: center; padding: 3px 10px;
   border-radius: 999px; background: rgba(165,180,252,.12);
   border: 1px solid rgba(165,180,252,.35); color: #c7d2fe; font-size: 12px; margin: 0 6px 6px 0; }
 .termpill b { cursor: pointer; }
-.topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 18px;
-  flex-wrap: wrap; }
+.topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
 .topbar .spacer { flex: 1; }
-#manage { display: none; }
+#manage, #advanced { display: none; }
+.tabs { display: flex; gap: 8px; margin-bottom: 18px; }
+.tab { padding: 9px 20px; border-radius: 999px; font-size: 14px; font-weight: 600;
+  cursor: pointer; color: rgba(255,255,255,.55);
+  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12); }
+.tab.active { color: #052e2b; background: linear-gradient(90deg,#34d399,#22d3ee); border: none; }
 </style>
 </head>
 <body>
@@ -85,11 +90,14 @@ a.art:hover { text-decoration: underline; }
   <div class="sub">Amazon Category Listing Report → compliant, optimized content. Review before upload — nothing publishes automatically.</div>
 
   <div class="topbar">
+    <div class="tabs">
+      <div class="tab active" id="tabDash" onclick="showTab('dash')">Dashboard</div>
+      <div class="tab" id="tabHist" onclick="showTab('hist')">Run history</div>
+    </div>
+    <span class="spacer"></span>
     <label style="margin:0">Seller</label>
     <select id="seller" onchange="switchSeller()"></select>
-    <span id="termsInline" class="muted"></span>
-    <span class="spacer"></span>
-    <button class="link" onclick="toggleManage()">Manage sellers &amp; attested facts ▾</button>
+    <button class="link" onclick="toggleManage()">Manage ▾</button>
   </div>
 
   <div class="glass" id="manage">
@@ -111,63 +119,69 @@ a.art:hover { text-decoration: underline; }
     </div>
   </div>
 
-  <div class="glass" id="latest" style="display:none">
-    <h2>Latest results <span class="muted" id="latestMeta"></span></h2>
-    <div id="latestPills"></div>
-    <div id="latestDl"></div>
-    <div class="row" style="margin:14px 0 8px">
-      <input id="dashSearch" placeholder="Search SKU / product type / correction…" style="flex:1" oninput="renderDash()">
-      <select id="dashFilter" onchange="renderDash()">
-        <option value="">All statuses</option>
-        <option value="ok">Upload-ready</option>
-        <option value="needs_review">Needs review</option>
-        <option value="failed">Failed</option>
-      </select>
+  <div id="viewDash">
+    <div class="glass">
+      <div class="drop" id="drop" onclick="document.getElementById('file').click()">
+        <b>Upload Category Listing Report</b><br>
+        drop the .xlsm here or click — the run starts automatically
+        <input type="file" id="file" accept=".xlsm,.xlsx" style="display:none" onchange="uploadFile(this.files[0])">
+      </div>
+      <div style="margin-top:8px"><button class="link" onclick="toggleAdvanced()">Advanced options ▾</button></div>
+      <div id="advanced">
+        <div class="row" style="margin-top:8px">
+          <div class="grow"><label>Report file</label><select id="uploads"></select></div>
+          <div><label>Mode</label><select id="mode">
+            <option value="">Full catalog (changed SKUs only)</option>
+            <option value="pilot">Pilot — one SKU per product type</option>
+            <option value="force">Force — regenerate everything</option>
+          </select></div>
+          <div><label>Workers</label><input id="workers" type="number" min="1" max="16" value="8" style="width:70px"></div>
+          <button class="primary" id="runBtn" onclick="startRun()">Start run</button>
+        </div>
+      </div>
+      <div id="log" style="margin-top:12px"></div>
+      <div id="runStats" style="margin-top:10px"></div>
     </div>
-    <div id="dash"></div>
-    <div style="text-align:center;margin-top:8px">
-      <button id="dashMore" style="display:none" onclick="dashShown+=50;renderDash(true)">Show 50 more</button>
+
+    <div class="glass" id="latest" style="display:none">
+      <h2>Results <span class="muted" id="latestMeta"></span></h2>
+      <div id="latestPills"></div>
+      <div id="latestDl"></div>
+      <div class="row" style="margin:14px 0 8px">
+        <input id="dashSearch" placeholder="Search SKU / product type / correction…" style="flex:1" oninput="renderDash()">
+        <select id="dashFilter" onchange="renderDash()">
+          <option value="">All statuses</option>
+          <option value="ok">Upload-ready</option>
+          <option value="needs_review">Needs review</option>
+          <option value="failed">Failed</option>
+        </select>
+      </div>
+      <div id="dash"></div>
+      <div style="text-align:center;margin-top:8px">
+        <button id="dashMore" style="display:none" onclick="dashShown+=50;renderDash(true)">Show 50 more</button>
+      </div>
+    </div>
+
+    <div class="glass" id="reviewCard" style="display:none">
+      <h2>Needs review <span class="muted" id="flagMeta"></span></h2>
+      <div id="flags"></div>
+      <div class="row" style="margin-top:8px">
+        <button class="primary" id="approveBtn" onclick="approveChecked()">Approve checked → download file</button>
+      </div>
     </div>
   </div>
 
-  <div class="glass">
-    <h2>New run</h2>
-    <div class="drop" id="drop" onclick="document.getElementById('file').click()">
-      Drop the Category Listing Report (.xlsm) here, or click to choose
-      <input type="file" id="file" accept=".xlsm,.xlsx" style="display:none" onchange="uploadFile(this.files[0])">
+  <div id="viewHist" style="display:none">
+    <div class="glass">
+      <h2>Run history</h2>
+      <div class="row" style="margin-bottom:10px">
+        <button onclick="refreshAll()">Refresh</button>
+        <button class="primary" onclick="mergeChecked()">Merge checked runs → one upload file</button>
+      </div>
+      <table id="runsTable"><thead><tr>
+        <th></th><th>Run</th><th>Result</th><th>Downloads</th>
+      </tr></thead><tbody></tbody></table>
     </div>
-    <div class="row" style="margin-top:12px">
-      <div class="grow"><label>Report file</label><select id="uploads"></select></div>
-      <div><label>Mode</label><select id="mode">
-        <option value="">Full catalog (changed SKUs only)</option>
-        <option value="pilot">Pilot — one SKU per product type</option>
-        <option value="force">Force — regenerate everything</option>
-      </select></div>
-      <div><label>Workers</label><input id="workers" type="number" min="1" max="16" value="8" style="width:70px"></div>
-      <button class="go" id="runBtn" onclick="startRun()">Start run</button>
-    </div>
-    <div id="log" style="margin-top:12px"></div>
-    <div id="runStats" style="margin-top:10px"></div>
-  </div>
-
-  <div class="glass">
-    <h2>Needs review <span class="muted" id="flagMeta"></span></h2>
-    <div class="muted" id="flagNote">Nothing flagged — or no finished run yet.</div>
-    <div id="flags"></div>
-    <div class="row" style="margin-top:8px">
-      <button class="primary" id="approveBtn" style="display:none" onclick="approveChecked()">Approve checked → download file</button>
-    </div>
-  </div>
-
-  <div class="glass">
-    <h2>Run history</h2>
-    <div class="row" style="margin-bottom:10px">
-      <button onclick="refreshRuns()">Refresh</button>
-      <button class="primary" onclick="mergeChecked()">Merge checked runs → one upload file</button>
-    </div>
-    <table id="runsTable"><thead><tr>
-      <th></th><th>Run</th><th>Result</th><th>Downloads</th>
-    </tr></thead><tbody></tbody></table>
   </div>
 </div>
 
@@ -178,20 +192,23 @@ const api = (p, opts) => fetch('/catalog/api' + p, opts).then(async r => {
   return r.json();
 });
 const $ = id => document.getElementById(id);
-let sellers = [], activeSeller = null, reviewRun = null;
-const DL_LABELS = {
-  "results.xlsx": ["Complete results (Excel)", "originals + corrections + review, one file", true],
-  "merged_upload.xlsx": ["Amazon upload — merged", "all approved SKUs, one file", true],
-  "approved_upload.xlsx": ["Amazon upload — approved after review", "SKUs you approved", true],
-  "upload.xlsx": ["Amazon upload file", "this run's approved SKUs", false],
-  "results.csv": ["CSV", "same data as the Excel", false],
-  "report.html": ["Review report", "printable before/after", false],
-};
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let sellers = [], activeSeller = null, reviewRun = null, overviewData = null;
 
-function toggleManage() {
-  const m = $('manage');
-  m.style.display = m.style.display === 'block' ? 'none' : 'block';
+function showTab(t) {
+  $('viewDash').style.display = t === 'dash' ? '' : 'none';
+  $('viewHist').style.display = t === 'hist' ? '' : 'none';
+  $('tabDash').classList.toggle('active', t === 'dash');
+  $('tabHist').classList.toggle('active', t === 'hist');
 }
+function toggleManage() {
+  const m = $('manage'); m.style.display = m.style.display === 'block' ? 'none' : 'block';
+}
+function toggleAdvanced() {
+  const a = $('advanced'); a.style.display = a.style.display === 'block' ? 'none' : 'block';
+}
+
 async function boot() {
   sellers = await api('/sellers');
   const sel = $('seller');
@@ -203,16 +220,13 @@ async function switchSeller() {
   activeSeller = $('seller').value || null;
   if (!activeSeller) return;
   renderTerms();
-  await refreshUploads();
-  await refreshRuns();   // also fills "Latest results" + flagged
+  await refreshAll();
 }
 function cfg() { return sellers.find(s => s.seller_id === activeSeller) || {}; }
 function renderTerms() {
   const t = cfg().attested_terms || {};
-  const keys = Object.keys(t);
-  $('termsInline').textContent = keys.length ? `attested: ${keys.join(', ')}` : '';
-  $('terms').innerHTML = keys.map(k =>
-    `<span class="termpill" title="${t[k].replace(/"/g,'&quot;')}">${k} <b onclick="removeTerm('${k}')">✕</b></span>`
+  $('terms').innerHTML = Object.entries(t).map(([k,v]) =>
+    `<span class="termpill" title="${v.replace(/"/g,'&quot;')}">${k} <b onclick="removeTerm('${k}')">✕</b></span>`
   ).join('') || '<span class="muted">none yet</span>';
 }
 async function createSeller() {
@@ -244,18 +258,20 @@ drop.addEventListener('drop', ev => { const f = ev.dataTransfer.files[0]; if (f)
 
 async function uploadFile(f) {
   if (!f || !activeSeller) return;
-  drop.textContent = 'Uploading ' + f.name + ' ...';
+  drop.innerHTML = '<b>Uploading ' + esc(f.name) + ' …</b>';
   try {
     const fd = new FormData(); fd.append('file', f);
     await fetch(`/catalog/api/sellers/${activeSeller}/upload`, {method:'POST', body: fd})
       .then(async r => { if (!r.ok) throw new Error((await r.json()).detail); });
-    drop.textContent = f.name + ' uploaded ✓ — now press Start run';
-    await refreshUploads();
-  } catch (e) { drop.textContent = 'Upload failed: ' + e.message; }
+    drop.innerHTML = '<b>' + esc(f.name) + ' uploaded ✓ — starting run…</b>';
+    await refreshUploadsSelect();
+    $('uploads').value = f.name;
+    startRun();  // one-step flow: upload starts the run
+  } catch (e) { drop.innerHTML = '<b>Upload failed:</b> ' + esc(e.message); }
 }
-async function refreshUploads() {
-  const files = await api(`/sellers/${activeSeller}/uploads`);
-  $('uploads').innerHTML = files.map(f => `<option>${f.filename}</option>`).join('')
+async function refreshUploadsSelect() {
+  const o = overviewData || await api(`/sellers/${activeSeller}/overview`);
+  $('uploads').innerHTML = (o.uploads||[]).map(u => `<option>${u.filename}</option>`).join('')
     || '<option value="">— upload a report first —</option>';
 }
 
@@ -281,28 +297,67 @@ async function poll(ticket) {
   el.scrollTop = el.scrollHeight;
   if (p.done) {
     clearInterval(pollTimer); $('runBtn').disabled = false;
+    drop.innerHTML = '<b>Upload Category Listing Report</b><br>drop the .xlsm here or click — the run starts automatically';
     if (p.error) { el.textContent += '\n\nERROR: ' + p.error; return; }
-    await refreshRuns();
+    await refreshAll();
   }
 }
 
-function dlButtons(runId, arts, bigFirst) {
-  const order = ["results.xlsx","merged_upload.xlsx","approved_upload.xlsx",
-                 "upload.xlsx","results.csv","report.html"];
-  return order.filter(a => arts.includes(a)).map((a, i) => {
-    const [label, sub, big] = DL_LABELS[a];
-    const cls = (bigFirst && (big || i === 0)) ? 'dl big' : 'dl';
-    return `<a class="${cls}" href="/catalog/api/sellers/${activeSeller}/runs/${runId}/file/${a}" target="_blank">
+const DL3 = [
+  ["results.xlsx", "Optimized content (Excel)", "originals + corrections + review, one file", "big"],
+  ["__upload__",   "Amazon upload file",        "ready for Seller Central",                  "violet"],
+  ["report.html",  "Review report",             "printable before/after",                    ""],
+];
+function threeButtons(runId, arts) {
+  const uploadArt = ["merged_upload.xlsx","approved_upload.xlsx","upload.xlsx"].find(a => arts.includes(a));
+  return DL3.map(([art, label, sub, cls]) => {
+    const a = art === "__upload__" ? uploadArt : (arts.includes(art) ? art : null);
+    if (!a) return '';
+    return `<a class="dl ${cls}" href="/catalog/api/sellers/${activeSeller}/runs/${runId}/file/${a}" target="_blank">
       <span>${label}<small>${sub}</small></span></a>`;
-  }).join('');
+  }).join('') +
+  (arts.includes("results.csv")
+    ? `<a class="art" style="display:inline-block;margin-top:4px" href="/catalog/api/sellers/${activeSeller}/runs/${runId}/file/results.csv" target="_blank">csv version</a>` : '');
 }
 
-// ---- inline before/after dashboard --------------------------------------
+async function refreshAll() {
+  overviewData = await api(`/sellers/${activeSeller}/overview`);
+  await refreshUploadsSelect();
+  const runs = overviewData.runs || [];
+  // history table
+  const tb = $('runsTable').querySelector('tbody');
+  tb.innerHTML = runs.map(r => {
+    const s = r.summary || {};
+    const links = (r.artifacts||[]).map(a =>
+      `<a class="art" href="/catalog/api/sellers/${activeSeller}/runs/${r.run_id}/file/${a}" target="_blank">${a}</a>`).join('');
+    const result = r.finished_at
+      ? `${(s.generated ?? 0) - (s.needs_review ?? 0)} ok · ${s.needs_review ?? 0} review · ${s.failed ?? 0} failed`
+      : 'running…';
+    return `<tr><td><input type="checkbox" class="runck" value="${r.run_id}"></td>` +
+      `<td><div>${r.run_id}</div><div class="muted">${esc((r.source_file||'').split('/').pop())}</div></td>` +
+      `<td>${result}</td><td>${links}</td></tr>`;
+  }).join('');
+  // latest finished run drives the dashboard
+  const latest = runs.find(r => r.finished_at && (r.artifacts||[]).length);
+  if (latest) {
+    const s = latest.summary || {};
+    $('latest').style.display = '';
+    $('latestMeta').textContent = `run ${latest.run_id}`;
+    $('latestPills').innerHTML =
+      `<span class="pill ok">${(s.generated ?? 0) - (s.needs_review ?? 0)} upload-ready</span>` +
+      `<span class="pill warn">${s.needs_review ?? 0} needs review</span>` +
+      `<span class="pill ${s.failed ? 'bad' : ''}">${s.failed ?? 0} failed</span>` +
+      `<span class="pill">${s.skipped_unchanged ?? 0} unchanged</span>`;
+    $('latestDl').innerHTML = threeButtons(latest.run_id, latest.artifacts);
+    loadFlags(latest.run_id);
+    loadDash(latest.run_id);
+  }
+}
+
+// ---- inline before/after browser ----------------------------------------
 let dashRows = [], dashShown = 50;
-const esc = s => String(s ?? '').replace(/[&<>"]/g, c =>
-  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 async function loadDash(runId) {
-  $('dash').innerHTML = '<div class="muted">Loading before/after data…</div>';
+  $('dash').innerHTML = '<div class="muted">Loading…</div>';
   try {
     const d = await api(`/sellers/${activeSeller}/runs/${runId}/rows`);
     dashRows = d.rows; dashShown = 50; renderDash();
@@ -316,7 +371,7 @@ function baBlock(label, before, after, count) {
       <div style="background:rgba(110,231,183,.07);border:1px solid rgba(110,231,183,.2);border-radius:8px;padding:8px">${esc(after)||'<i>—</i>'}</div>
     </div></div>`;
 }
-function renderDash(append) {
+function renderDash() {
   const q = ($('dashSearch').value || '').toLowerCase();
   const st = $('dashFilter').value;
   const match = dashRows.filter(r =>
@@ -352,57 +407,22 @@ function renderDash(append) {
   $('dashMore').style.display = match.length > dashShown ? '' : 'none';
 }
 
-async function refreshRuns() {
-  const runs = await api(`/sellers/${activeSeller}/runs`);
-  const tb = $('runsTable').querySelector('tbody');
-  tb.innerHTML = '';
-  let latestDone = null;
-  for (const r of runs) {
-    const s = r.summary || {};
-    const arts = await api(`/sellers/${activeSeller}/runs/${r.run_id}/artifacts`).catch(()=>[]);
-    if (!latestDone && r.finished_at && arts.length) latestDone = {r, s, arts};
-    const links = arts.map(a =>
-      `<a class="art" href="/catalog/api/sellers/${activeSeller}/runs/${r.run_id}/file/${a}" target="_blank">${a}</a>`).join('');
-    const result = r.finished_at
-      ? `${(s.generated ?? 0) - (s.needs_review ?? 0)} ok · ${s.needs_review ?? 0} review · ${s.failed ?? 0} failed`
-      : 'running…';
-    tb.insertAdjacentHTML('beforeend',
-      `<tr><td><input type="checkbox" class="runck" value="${r.run_id}"></td>` +
-      `<td><div>${r.run_id}</div><div class="muted">${(r.source_file||'').split('/').pop()}</div></td>` +
-      `<td>${result}</td><td>${links}</td></tr>`);
-  }
-  if (latestDone) {
-    const {r, s, arts} = latestDone;
-    $('latest').style.display = '';
-    $('latestMeta').textContent = `run ${r.run_id}`;
-    $('latestPills').innerHTML =
-      `<span class="pill ok">${(s.generated ?? 0) - (s.needs_review ?? 0)} upload-ready</span>` +
-      `<span class="pill warn">${s.needs_review ?? 0} needs review</span>` +
-      `<span class="pill ${s.failed ? 'bad' : ''}">${s.failed ?? 0} failed</span>` +
-      `<span class="pill">${s.skipped_unchanged ?? 0} unchanged</span>`;
-    $('latestDl').innerHTML = dlButtons(r.run_id, arts, true);
-    loadFlags(r.run_id);
-    loadDash(r.run_id);
-  }
-}
-
 async function loadFlags(runId) {
   reviewRun = runId;
   const flags = await api(`/sellers/${activeSeller}/runs/${runId}/flagged`).catch(()=>[]);
+  $('reviewCard').style.display = flags.length ? '' : 'none';
   $('flagMeta').textContent = `run ${runId}`;
-  $('flagNote').style.display = flags.length ? 'none' : '';
   $('flags').innerHTML = flags.map(f => `
     <div class="flag">
       <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer">
         <input type="checkbox" class="flagck" value="${f.sku}" style="margin-top:3px">
         <div>
-          <div class="sku">${f.sku} <span class="muted">${f.product_type}</span></div>
-          <div class="why">${f.issues.join('<br>')}</div>
-          <div class="txt">${(f.generated?.title)||''}</div>
+          <div class="sku">${esc(f.sku)} <span class="muted">${esc(f.product_type)}</span></div>
+          <div class="why">${f.issues.map(esc).join('<br>')}</div>
+          <div class="txt">${esc((f.generated||{}).title||'')}</div>
         </div>
       </label>
     </div>`).join('');
-  $('approveBtn').style.display = flags.length ? '' : 'none';
 }
 async function approveChecked() {
   const skus = [...document.querySelectorAll('.flagck:checked')].map(c => c.value);
@@ -410,8 +430,8 @@ async function approveChecked() {
   if (!confirm(`Approve ${skus.length} SKU(s)? This writes approved_upload.xlsx and records your approval in the audit log.`)) return;
   const r = await api(`/sellers/${activeSeller}/runs/${reviewRun}/approve`, {method:'POST',
     headers:{'Content-Type':'application/json'}, body: JSON.stringify({skus})});
-  alert(`${r.written} SKU(s) written to approved_upload.xlsx — download it from Latest results`);
-  await refreshRuns();
+  alert(`${r.written} SKU(s) approved — the Amazon upload file button now includes them`);
+  await refreshAll();
 }
 async function mergeChecked() {
   const ids = [...document.querySelectorAll('.runck:checked')].map(c => c.value);
@@ -419,7 +439,7 @@ async function mergeChecked() {
   const r = await api(`/sellers/${activeSeller}/merged-upload`, {method:'POST',
     headers:{'Content-Type':'application/json'}, body: JSON.stringify({run_ids: ids})});
   alert(`${r.written} SKUs merged into merged_upload.xlsx (run ${r.run_id})`);
-  await refreshRuns();
+  await refreshAll();
 }
 boot();
 </script>

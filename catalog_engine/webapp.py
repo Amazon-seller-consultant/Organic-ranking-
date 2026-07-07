@@ -318,16 +318,51 @@ def _cached_parse(source_file: str, seller_id: str):
 
 @router.get("/api/sellers/{seller_id}/runs/{run_id}/rows")
 def dashboard_rows(seller_id: str, run_id: str) -> dict[str, Any]:
-    """Before/after/corrections per SKU for the in-page dashboard."""
-    from .output import _BULK_HEADER, build_bulk_rows_from_results
+    """Before/after/corrections per SKU for the in-page dashboard.
+
+    Served from the precomputed rows.json when available (fast path);
+    otherwise rebuilt from the source workbook once and cached to disk."""
+    from .output import _BULK_HEADER, _dump_json, build_bulk_rows_from_results
 
     _check_id(seller_id, "seller_id")
     store = _store()
     try:
+        d = _run_dir(store, seller_id, run_id)
+        cached = d / "rows.json"
+        if cached.exists():
+            return json.loads(cached.read_text(encoding="utf-8"))
         results = _load_results(store, seller_id, run_id)
         parse = _cached_parse(results["source_file"], seller_id)
-        return {"header": _BULK_HEADER,
-                "rows": build_bulk_rows_from_results(parse, results)}
+        payload = {"header": _BULK_HEADER,
+                   "rows": build_bulk_rows_from_results(parse, results)}
+        _dump_json(payload, cached)
+        return payload
+    finally:
+        store.close()
+
+
+@router.get("/api/sellers/{seller_id}/overview")
+def overview(seller_id: str) -> dict[str, Any]:
+    """Everything the page needs on load, in one round trip: runs with their
+    artifact lists, plus the uploads list."""
+    _check_id(seller_id, "seller_id")
+    store = _store()
+    try:
+        _seller_or_404(store, seller_id)
+        runs = store.list_runs(seller_id)
+        outdir = store.seller_dir(seller_id) / "outputs"
+        for r in runs:
+            d = outdir / r["run_id"]
+            r["artifacts"] = sorted(
+                p.name for p in d.iterdir() if p.name in _ARTIFACT_NAMES
+            ) if d.is_dir() else []
+        updir = store.seller_dir(seller_id) / "uploads"
+        uploads = sorted(
+            ({"filename": p.name, "mtime": p.stat().st_mtime}
+             for p in updir.glob("*.xls[mx]")),
+            key=lambda x: -x["mtime"],
+        )
+        return {"runs": runs, "uploads": uploads}
     finally:
         store.close()
 
@@ -348,6 +383,8 @@ def rebuild_exports(seller_id: str, run_id: str) -> dict[str, Any]:
         d = _run_dir(store, seller_id, run_id)
         _write_results_csv_rows(rows, d / "results.csv")
         _write_results_xlsx_rows(rows, d / "results.xlsx")
+        from .output import _BULK_HEADER, _dump_json
+        _dump_json({"header": _BULK_HEADER, "rows": rows}, d / "rows.json")
         return {"ok": True, "rows": len(rows)}
     finally:
         store.close()
