@@ -52,7 +52,7 @@ def make_gen(**overrides):
     base = dict(
         sku="SKU-1",
         title="Poster Holder Wall Mount",
-        item_highlights=["Easy to hang", "Slim profile"],
+        item_highlight="Easy install slim design",
         bullets=["Easy to hang", "Slim profile design", "Fits standard posters"],
         description="A simple poster holder for home and office walls",
         search_terms="poster holder wall mount",
@@ -391,7 +391,7 @@ class TestNoMutation:
             search_terms="Displays poster poster holder",
         )
         snapshot = dataclasses.replace(
-            gen, item_highlights=list(gen.item_highlights),
+            gen, item_highlight=gen.item_highlight,
             bullets=list(gen.bullets))
         new_gen, _, _ = run(record, gen)
         assert gen == snapshot
@@ -417,9 +417,7 @@ def test_attested_claim_allowed_and_logged():
     )
     gen = GeneratedContent(
         sku="SKU1", title="Acme Clear Sign Holder 8.5 x 11 Inch Display",
-        item_highlights=["Clear acrylic front panel for glare-free viewing",
-                         "Holds standard 8.5 x 11 inch inserts",
-                         "Slide-in loading for fast sign changes"],
+        item_highlight="Slide-in loading for fast sign changes",
         bullets=["Clear front panel protects inserts",
                  "Fits standard 8.5 x 11 inch signs",
                  "Slide-in design for quick updates"],
@@ -441,3 +439,56 @@ def test_attested_claim_allowed_and_logged():
     assert att and att[0].severity is Severity.INFO
     assert any(e.category == "attested" and "attestation" in e.reason
                for e in log_yes), "attestation must land in the audit log"
+
+
+# ---------------------------------------------------------------------------
+# Item Highlight is a single field (Amazon: one title_differentiation column,
+# a short benefit phrase that must not repeat the item name)
+# ---------------------------------------------------------------------------
+def test_item_highlight_is_single_string_field():
+    rec = make_record()
+    gen = make_gen(item_highlight="Non-slip rubber feet")
+    new_gen, issues, _ = run(rec, gen)
+    assert isinstance(new_gen.item_highlight, str)
+    assert new_gen.item_highlight == "Non-slip rubber feet"
+    assert not any(i.rule == "highlight_repeats_title" for i in issues)
+
+
+def test_item_highlight_over_limit_auto_trims():
+    rec = make_record()
+    long_highlight = "Extra durable reinforced construction built to last " * 3
+    gen = make_gen(item_highlight=long_highlight.strip())
+    new_gen, issues, _ = run(rec, gen, mode="auto_trim")
+    assert char_len(new_gen.item_highlight) <= 125
+    assert any(i.rule == "highlight_max_chars" and i.action == "trimmed"
+               for i in issues)
+
+
+def test_item_highlight_repeating_title_is_flagged():
+    rec = make_record()
+    gen = make_gen(
+        title="Poster Holder Wall Mount",
+        item_highlight="Wall mount poster holder",  # same words, reordered
+    )
+    _, issues, _ = run(rec, gen)
+    hits = [i for i in issues if i.rule == "highlight_repeats_title"]
+    assert hits, "highlight repeating only title words must be flagged"
+    assert hits[0].severity is Severity.WARNING  # quality note, not a blocker
+
+
+def test_item_highlight_with_new_information_not_flagged():
+    rec = make_record()
+    gen = make_gen(
+        title="Poster Holder Wall Mount",
+        item_highlight="Includes anti-tip mounting hardware",
+    )
+    _, issues, _ = run(rec, gen)
+    assert not any(i.rule == "highlight_repeats_title" for i in issues)
+
+
+def test_empty_item_highlight_skips_repeat_check():
+    rec = make_record()
+    gen = make_gen(item_highlight="")
+    new_gen, issues, _ = run(rec, gen)
+    assert new_gen.item_highlight == ""
+    assert not any(i.rule == "highlight_repeats_title" for i in issues)

@@ -128,6 +128,10 @@ class ProductRecord:
         return self.first("product_description")
 
     @property
+    def item_highlight(self) -> Optional[str]:
+        return self.first("title_differentiation")
+
+    @property
     def search_terms(self) -> list[str]:
         return self.attributes.get("generic_keyword", [])
 
@@ -183,7 +187,10 @@ class SellerConfig:
 class GeneratedContent:
     sku: str
     title: str = ""
-    item_highlights: list[str] = field(default_factory=list)  # <=125 chars each
+    # Amazon's flat file has exactly one Item Highlight field
+    # (title_differentiation): a single benefit-driven phrase, not a
+    # sentence, that must not repeat the item name. <=125 chars.
+    item_highlight: str = ""
     bullets: list[str] = field(default_factory=list)  # exactly 3, <=125 chars
     description: str = ""  # plain text, <=2000 chars
     search_terms: str = ""  # single space-separated string, <=249 bytes UTF-8

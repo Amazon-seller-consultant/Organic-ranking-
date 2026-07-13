@@ -226,6 +226,38 @@ def _strip_html_field(
 
 
 # ---------------------------------------------------------------------------
+# Check: Item Highlight must not repeat the item name (Amazon's own spec:
+# "Do not repeat information already in the item name.")
+# ---------------------------------------------------------------------------
+_STOPWORDS = {
+    "a", "an", "the", "and", "or", "for", "with", "of", "in", "on", "to",
+    "by", "your", "you", "is", "are", "this", "that", "from", "at", "as",
+}
+
+
+def _significant_words(s: str) -> set:
+    words = _normalize_words(s).split()
+    return {w for w in words if len(w) >= 3 and w not in _STOPWORDS}
+
+
+def _check_highlight_repeats_title(
+    record: ProductRecord, title: str, highlight: str, issues: List[Issue]
+) -> None:
+    hl_words = _significant_words(highlight)
+    if not hl_words:
+        return
+    title_words = _significant_words(title)
+    if hl_words <= title_words:  # every meaningful word already in the title
+        issues.append(Issue(
+            sku=record.sku, field_name="item_highlight",
+            rule="highlight_repeats_title", severity=Severity.WARNING,
+            message="Item Highlight repeats words already in the title — "
+                    "Amazon's guidance says this adds no new information",
+            action="flagged", before=highlight, after=highlight,
+        ))
+
+
+# ---------------------------------------------------------------------------
 # Check 5: limit utilization (INFO) — unused chars are unused SEO space
 # ---------------------------------------------------------------------------
 def _check_utilization(
@@ -481,7 +513,7 @@ def verify_generated(
     auto_trim = config.on_limit_violation == "auto_trim"
 
     title = gen.title or ""
-    highlights = list(gen.item_highlights)
+    highlight = gen.item_highlight or ""
     bullets = list(gen.bullets)
     description = gen.description or ""
     search_terms = gen.search_terms or ""
@@ -491,8 +523,7 @@ def verify_generated(
         return _strip_html_field(record, field_name, text, issues)
 
     title = strip_html("title", title)
-    highlights = [strip_html("highlight_%d" % (i + 1), h)
-                  for i, h in enumerate(highlights)]
+    highlight = strip_html("item_highlight", highlight)
     bullets = [strip_html("bullet_%d" % (i + 1), b)
                for i, b in enumerate(bullets)]
     description = strip_html("description", description)
@@ -504,7 +535,7 @@ def verify_generated(
             record, field_name, text, haystack_norm, run_id, issues, log)
 
     title = scan("title", title)
-    highlights = [scan("highlight_%d" % (i + 1), h) for i, h in enumerate(highlights)]
+    highlight = scan("item_highlight", highlight)
     bullets = [scan("bullet_%d" % (i + 1), b) for i, b in enumerate(bullets)]
     description = scan("description", description)
     search_terms = scan("search_terms", search_terms)
@@ -514,8 +545,7 @@ def verify_generated(
         _normalize_words(term): note
         for term, note in (config.attested_terms or {}).items()
     }
-    claim_fields = [("title", title)]
-    claim_fields += [("highlight_%d" % (i + 1), h) for i, h in enumerate(highlights)]
+    claim_fields = [("title", title), ("item_highlight", highlight)]
     claim_fields += [("bullet_%d" % (i + 1), b) for i, b in enumerate(bullets)]
     claim_fields.append(("description", description))
     for field_name, text in claim_fields:
@@ -527,12 +557,11 @@ def verify_generated(
     title = _enforce_char_limit(
         record, "title", title, TITLE_MAX_CHARS, "title_max_chars",
         auto_trim, run_id, issues, log)
-    highlights = [
-        _enforce_char_limit(
-            record, "highlight_%d" % (i + 1), h, HIGHLIGHT_MAX_CHARS,
-            "highlight_max_chars", auto_trim, run_id, issues, log)
-        for i, h in enumerate(highlights)
-    ]
+    highlight = _enforce_char_limit(
+        record, "item_highlight", highlight, HIGHLIGHT_MAX_CHARS,
+        "highlight_max_chars", auto_trim, run_id, issues, log)
+    if highlight:
+        _check_highlight_repeats_title(record, title, highlight, issues)
 
     if len(bullets) > BULLET_COUNT:
         dropped = bullets[BULLET_COUNT:]
@@ -663,10 +692,9 @@ def verify_generated(
     # -- 5. limit utilization (INFO only — unused space = unused SEO) ----
     _check_utilization(record, "title", title,
                        UTILIZATION_FLOORS["title"], TITLE_MAX_CHARS, issues)
-    for i, h in enumerate(highlights):
-        _check_utilization(record, "highlight_%d" % (i + 1), h,
-                           UTILIZATION_FLOORS["highlight"], HIGHLIGHT_MAX_CHARS,
-                           issues)
+    _check_utilization(record, "item_highlight", highlight,
+                       UTILIZATION_FLOORS["highlight"], HIGHLIGHT_MAX_CHARS,
+                       issues)
     for i, b in enumerate(bullets):
         _check_utilization(record, "bullet_%d" % (i + 1), b,
                            UTILIZATION_FLOORS["bullet"], BULLET_MAX_CHARS, issues)
@@ -680,7 +708,7 @@ def verify_generated(
     new_gen = dataclasses.replace(
         gen,
         title=title,
-        item_highlights=highlights,
+        item_highlight=highlight,
         bullets=bullets,
         description=description,
         search_terms=search_terms,

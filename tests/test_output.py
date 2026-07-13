@@ -43,7 +43,7 @@ def _gen(sku: str, n: int) -> GeneratedContent:
     return GeneratedContent(
         sku=sku,
         title=f"Acme Widget {n} Oak 11x17 Frame",
-        item_highlights=[f"Highlight one for {sku}", f"Highlight two for {sku}"],
+        item_highlight=f"Highlight for {sku}",
         bullets=[
             f"DURABLE BUILD - bullet one for product {n}",
             f"EASY SETUP - bullet two for product {n}",
@@ -184,6 +184,9 @@ def test_data_row_has_only_expected_cells(parse, outcomes, upload_ws):
         _col(parse, "product_description").index: gen.description,
         _col(parse, "generic_keyword", 1).index: gen.search_terms,
     }
+    highlight_cols = [c for c in parse.columns if c.base == "title_differentiation"]
+    if highlight_cols:
+        expected[highlight_cols[0].index] = gen.item_highlight
     max_col = max(c.index for c in parse.columns) + 1
     for idx in range(max_col):
         value = upload_ws.cell(row, idx + 1).value
@@ -251,7 +254,7 @@ def test_results_json_structure(artifacts, outcomes):
     ok = by_sku[outcomes[0].record.sku]
     assert ok["status"] == "ok"
     gen = ok["generated"]
-    assert gen["item_highlights"] == outcomes[0].generated.item_highlights
+    assert gen["item_highlight"] == outcomes[0].generated.item_highlight
     counts = gen["counts"]
     assert counts["title_chars"] == len(outcomes[0].generated.title)
     assert counts["bullet_chars"] == [

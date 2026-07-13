@@ -75,7 +75,7 @@ USE THE FULL SPACE
 Every unused character is unused indexing. Target these fills, without
 padding, fluff, or inventing facts to get there:
 - title: aim for {title_target}-{title_max} of {title_max} chars
-- each highlight: aim for {highlight_target}-{highlight_max} of {highlight_max} chars
+- item_highlight: aim for {highlight_target}-{highlight_max} of {highlight_max} chars
 - each bullet: aim for {bullet_target}-{bullet_max} of {bullet_max} chars
 - description: aim for {description_target}-{description_max} of {description_max} chars
 - search_terms: aim for {search_target}-{search_terms_max} of {search_terms_max} bytes
@@ -113,9 +113,13 @@ FIELD FORMAT RULES
 - title: <= {title_max} characters INCLUDING the brand name, which must
   appear at the start. Title Case. No promo words, no ALL CAPS words except
   the brand's own styling, no special characters like ~!*$?_{{}}#<>|.
-- item_highlights: exactly 3 strings, each <= {highlight_max} characters.
-  Scannable phrases of the strongest verifiable selling points. Sentence
-  fragments, no terminal periods.
+- item_highlight: ONE string, <= {highlight_max} characters. Amazon shows
+  exactly one Item Highlight field (not several), and only when the title
+  is under 75 characters. A single benefit-driven phrase, NOT a full
+  sentence, no terminal period. It MUST say something the title does not —
+  never restate the brand, product type, or any word already in the title;
+  add a distinct verifiable selling point instead (a differentiator not
+  already spent in the title or bullets).
 - bullets: exactly {bullet_count} strings, each <= {bullet_max} characters.
   Sentence fragments (NOT full sentences), no terminal periods, distinct
   facts per bullet.
@@ -131,16 +135,14 @@ OUTPUT_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
         "title": {"type": "string"},
-        "item_highlights": {
-            "type": "array", "items": {"type": "string"},
-        },
+        "item_highlight": {"type": "string"},
         "bullets": {
             "type": "array", "items": {"type": "string"},
         },
         "description": {"type": "string"},
         "search_terms": {"type": "string"},
     },
-    "required": ["title", "item_highlights", "bullets", "description", "search_terms"],
+    "required": ["title", "item_highlight", "bullets", "description", "search_terms"],
     "additionalProperties": False,
 }
 
@@ -274,7 +276,7 @@ def generate_for_record(
     return GeneratedContent(
         sku=record.sku,
         title=str(data.get("title", "")).strip(),
-        item_highlights=[str(h).strip() for h in data.get("item_highlights", [])],
+        item_highlight=str(data.get("item_highlight", "")).strip(),
         bullets=[str(b).strip() for b in data.get("bullets", [])],
         description=str(data.get("description", "")).strip(),
         search_terms=str(data.get("search_terms", "")).strip(),

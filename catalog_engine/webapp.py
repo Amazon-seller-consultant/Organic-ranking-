@@ -418,7 +418,7 @@ def catalog_view(seller_id: str) -> dict[str, Any]:
         _write_results_csv_rows(all_rows, d / "catalog_results.csv")
         ok_pairs = [
             (r[0], {"title": r[7],
-                    "item_highlights": [h for h in (r[9], r[10], r[11]) if h],
+                    "item_highlight": r[10],
                     "bullets": [b for b in (r[13], r[15], r[17]) if b],
                     "description": r[20], "search_terms": r[23]})
             for r in all_rows if r[3] == "ok"

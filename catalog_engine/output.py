@@ -89,6 +89,16 @@ def _bytes_utf8(s: str) -> int:
     return len((s or "").encode("utf-8"))
 
 
+def _extract_highlight(gen: dict[str, Any]) -> str:
+    """The single Item Highlight from a results.json generated-dict. Falls
+    back to the first entry of the old 3-item "item_highlights" list for
+    runs saved before Amazon's single-field spec was confirmed."""
+    if gen.get("item_highlight"):
+        return gen["item_highlight"]
+    old = gen.get("item_highlights")
+    return old[0] if old else ""
+
+
 # ---------------------------------------------------------------------------
 # upload.xlsx
 # ---------------------------------------------------------------------------
@@ -108,6 +118,9 @@ def _write_upload_xlsx(
     ]
     desc_col = _require_column(cols, "product_description", src)
     keyword_col = _require_column(cols, "generic_keyword", src)
+    # Item Highlight (title_differentiation): optional — older templates may
+    # not have this column yet. Written only when present.
+    highlight_col = _find_column(cols, "title_differentiation")
 
     src_path = Path(parse.source_file)
     if not src_path.exists():
@@ -161,6 +174,8 @@ def _write_upload_xlsx(
         put(pt_col, outcome.record.product_type)
         put(action_col, RECORD_ACTION_VALUE)
         put(title_col, gen.title)
+        if highlight_col is not None:
+            put(highlight_col, gen.item_highlight)
         # Bullets 1-3 only. #4/#5 stay EMPTY on purpose: partial update ignores
         # blank cells, so the seller's existing bullets 4-5 are preserved.
         for col, bullet in zip(bullet_cols, gen.bullets[:3]):
@@ -195,12 +210,13 @@ def _generated_dict(outcome: SkuOutcome) -> Optional[dict[str, Any]]:
         return None
     return {
         "title": gen.title,
-        "item_highlights": list(gen.item_highlights),
+        "item_highlight": gen.item_highlight,
         "bullets": list(gen.bullets),
         "description": gen.description,
         "search_terms": gen.search_terms,
         "counts": {
             "title_chars": _chars(gen.title),
+            "item_highlight_chars": _chars(gen.item_highlight),
             "bullet_chars": [_chars(b) for b in gen.bullets],
             "description_chars": _chars(gen.description),
             "search_terms_bytes": _bytes_utf8(gen.search_terms),
@@ -267,7 +283,7 @@ def write_upload_subset(
             generated=GeneratedContent(
                 sku=sku,
                 title=gen.get("title", ""),
-                item_highlights=list(gen.get("item_highlights", [])),
+                item_highlight=_extract_highlight(gen),
                 bullets=list(gen.get("bullets", [])),
                 description=gen.get("description", ""),
                 search_terms=gen.get("search_terms", ""),
@@ -285,7 +301,7 @@ def write_upload_subset(
 _BULK_HEADER = [
     "sku", "asin", "product_type", "status", "review_reasons", "corrections",
     "title_before", "title_after", "title_chars",
-    "highlight_1", "highlight_2", "highlight_3",
+    "item_highlight_before", "item_highlight_after", "item_highlight_chars",
     "bullet_1_before", "bullet_1_after",
     "bullet_2_before", "bullet_2_after",
     "bullet_3_before", "bullet_3_after", "bullet_chars",
@@ -302,7 +318,7 @@ def _bulk_row(record, gen_dict: Optional[dict], status: str,
     rebuilt-from-results exports share this single builder.
     """
     g = gen_dict or {}
-    hl = list(g.get("item_highlights", [])) + ["", "", ""]
+    hl_after = _extract_highlight(g)
     bl = list(g.get("bullets", [])) + ["", "", ""]
     before_bl = list(record.bullets) + ["", "", ""]
     title = g.get("title", "")
@@ -312,7 +328,7 @@ def _bulk_row(record, gen_dict: Optional[dict], status: str,
         record.sku, record.asin or "", record.product_type, status,
         review_reasons, corrections,
         record.title or "", title, _chars(title),
-        hl[0], hl[1], hl[2],
+        record.item_highlight or "", hl_after, _chars(hl_after),
         before_bl[0], bl[0], before_bl[1], bl[1], before_bl[2], bl[2],
         "|".join(str(_chars(b)) for b in bl[:3]),
         record.description or "", desc, _chars(desc),
@@ -327,7 +343,7 @@ def _bulk_rows(outcomes: list[SkuOutcome]) -> list[list[Any]]:
         gen_dict = None
         if gen is not None:
             gen_dict = {
-                "title": gen.title, "item_highlights": list(gen.item_highlights),
+                "title": gen.title, "item_highlight": gen.item_highlight,
                 "bullets": list(gen.bullets), "description": gen.description,
                 "search_terms": gen.search_terms,
             }
@@ -516,6 +532,11 @@ def _card_html(outcome: SkuOutcome) -> str:
         _ba_row("Title", rec.title, title_after,
                 _count_span(_chars(title_after), TITLE_MAX_CHARS, "chars"))
     )
+    highlight_after = gen.item_highlight if gen else ""
+    parts.append(
+        _ba_row("Item Highlight", rec.item_highlight, highlight_after,
+                _count_span(_chars(highlight_after), HIGHLIGHT_MAX_CHARS, "chars"))
+    )
     before_bullets = rec.bullets
     after_bullets = gen.bullets if gen else []
     for i in range(3):
@@ -537,21 +558,6 @@ def _card_html(outcome: SkuOutcome) -> str:
                             "bytes"))
     )
     parts.append("</table>")
-
-    # Item highlights (after only — no template column exists for these)
-    if gen and gen.item_highlights:
-        parts.append("<h3>Item Highlights</h3>")
-        parts.append(
-            '<div class="hl-note">not uploaded — paste into Seller Central '
-            "manually</div>"
-        )
-        parts.append('<ul class="hl">')
-        for hl in gen.item_highlights:
-            parts.append(
-                f"<li>{_esc(hl)} "
-                f"{_count_span(_chars(hl), HIGHLIGHT_MAX_CHARS, 'chars')}</li>"
-            )
-        parts.append("</ul>")
 
     # Issues
     if outcome.issues:
