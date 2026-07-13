@@ -364,36 +364,41 @@ function baBlock(label, before, after, count) {
       <div style="background:rgba(110,231,183,.07);border:1px solid rgba(110,231,183,.2);border-radius:8px;padding:8px">${esc(after)||'<i>—</i>'}</div>
     </div></div>`;
 }
+// row shape: 0 sku, 1 asin, 2 product_type, 3 status, 4 review_reasons,
+// 5 corrections, 6 title_before, 7 title_after, 8 title_chars,
+// 9-11 highlights, 12-17 bullets (before/after x3), 18 bullet_chars,
+// 19-21 description, 22-24 search_terms
 function renderDash() {
   const q = ($('dashSearch').value || '').toLowerCase();
   const st = $('dashFilter').value;
   const match = dashRows.filter(r =>
-    (!st || r[2] === st) &&
-    (!q || (r[0]+' '+r[1]+' '+r[3]+' '+r[4]).toLowerCase().includes(q)));
+    (!st || r[3] === st) &&
+    (!q || (r[0]+' '+r[1]+' '+r[2]+' '+r[4]+' '+r[5]).toLowerCase().includes(q)));
   const shown = match.slice(0, dashShown);
   $('dash').innerHTML =
     `<div class="muted" style="margin-bottom:6px">${match.length} SKU(s)${q||st?' matching':''} — click a row for full before/after</div>` +
     shown.map(r => {
-      const pill = r[2]==='ok' ? 'ok' : r[2]==='needs_review' ? 'warn' : 'bad';
-      const corr = r[4] ? `<div class="why" style="color:#93c5fd">${esc(r[4])}</div>` : '';
-      const why = r[3] ? `<div class="why">${esc(r[3])}</div>` : '';
+      const pill = r[3]==='ok' ? 'ok' : r[3]==='needs_review' ? 'warn' : 'bad';
+      const corr = r[5] ? `<div class="why" style="color:#93c5fd">${esc(r[5])}</div>` : '';
+      const why = r[4] ? `<div class="why">${esc(r[4])}</div>` : '';
       return `<details style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:8px 12px;margin:0 0 8px">
         <summary style="cursor:pointer;display:flex;gap:10px;align-items:center;list-style:none">
-          <span class="pill ${pill}" style="margin:0">${r[2]==='ok'?'ready':r[2]==='needs_review'?'review':'failed'}</span>
+          <span class="pill ${pill}" style="margin:0">${r[3]==='ok'?'ready':r[3]==='needs_review'?'review':'failed'}</span>
           <span style="font-weight:600">${esc(r[0])}</span>
-          <span class="muted">${esc(r[1])}</span>
-          <span class="muted" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r[6]||r[5])}</span>
+          <span class="muted">${r[1] ? 'ASIN '+esc(r[1]) : 'no ASIN'}</span>
+          <span class="muted">${esc(r[2])}</span>
+          <span class="muted" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r[7]||r[6])}</span>
         </summary>
         <div style="margin-top:8px">
           ${why}${corr}
-          ${baBlock('Title', r[5], r[6], r[7]+'/75 chars')}
-          ${baBlock('Bullet 1', r[11], r[12])}
-          ${baBlock('Bullet 2', r[13], r[14])}
-          ${baBlock('Bullet 3', r[15], r[16], r[17]+' /125 chars')}
-          ${r[8]||r[9]||r[10] ? `<div style="margin:6px 0"><div class="muted">Item highlights (paste into Seller Central manually)</div>
-            <div style="font-size:12px">• ${esc(r[8])}<br>• ${esc(r[9])}<br>• ${esc(r[10])}</div></div>` : ''}
-          ${baBlock('Description', r[18], r[19], r[20]+'/2000 chars')}
-          ${baBlock('Search terms', r[21], r[22], r[23]+'/249 bytes')}
+          ${baBlock('Title', r[6], r[7], r[8]+'/75 chars')}
+          ${baBlock('Bullet 1', r[12], r[13])}
+          ${baBlock('Bullet 2', r[14], r[15])}
+          ${baBlock('Bullet 3', r[16], r[17], r[18]+' /125 chars')}
+          ${r[9]||r[10]||r[11] ? `<div style="margin:6px 0"><div class="muted">Item highlights (paste into Seller Central manually)</div>
+            <div style="font-size:12px">• ${esc(r[9])}<br>• ${esc(r[10])}<br>• ${esc(r[11])}</div></div>` : ''}
+          ${baBlock('Description', r[19], r[20], r[21]+'/2000 chars')}
+          ${baBlock('Search terms', r[22], r[23], r[24]+'/249 bytes')}
         </div>
       </details>`;
     }).join('');
@@ -410,7 +415,7 @@ async function loadFlags(runId) {
       <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer">
         <input type="checkbox" class="flagck" value="${f.sku}" style="margin-top:3px">
         <div>
-          <div class="sku">${esc(f.sku)} <span class="muted">${esc(f.product_type)}</span></div>
+          <div class="sku">${esc(f.sku)} <span class="muted">${f.asin ? 'ASIN '+esc(f.asin)+' · ' : ''}${esc(f.product_type)}</span></div>
           <div class="why">${f.issues.map(esc).join('<br>')}</div>
           <div class="txt">${esc((f.generated||{}).title||'')}</div>
         </div>

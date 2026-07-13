@@ -218,6 +218,7 @@ def _write_results_json(
         "skus": [
             {
                 "sku": o.record.sku,
+                "asin": o.record.asin,
                 "status": o.status,
                 "skip_reason": o.skip_reason,
                 "product_type": o.record.product_type,
@@ -282,7 +283,7 @@ def write_upload_subset(
 # per SKU, ready for review in Excel/Sheets or downstream tooling)
 # ---------------------------------------------------------------------------
 _BULK_HEADER = [
-    "sku", "product_type", "status", "review_reasons", "corrections",
+    "sku", "asin", "product_type", "status", "review_reasons", "corrections",
     "title_before", "title_after", "title_chars",
     "highlight_1", "highlight_2", "highlight_3",
     "bullet_1_before", "bullet_1_after",
@@ -308,7 +309,8 @@ def _bulk_row(record, gen_dict: Optional[dict], status: str,
     desc = g.get("description", "")
     terms = g.get("search_terms", "")
     return [
-        record.sku, record.product_type, status, review_reasons, corrections,
+        record.sku, record.asin or "", record.product_type, status,
+        review_reasons, corrections,
         record.title or "", title, _chars(title),
         hl[0], hl[1], hl[2],
         before_bl[0], bl[0], before_bl[1], bl[1], before_bl[2], bl[2],
@@ -378,9 +380,9 @@ def _write_results_xlsx_rows(rows: list[list[Any]], path: Path) -> None:
         ws.append(row)
     ws.freeze_panes = "A2"
     ws.auto_filter.ref = ws.dimensions
-    widths = {"A": 22, "B": 16, "C": 12, "D": 45, "E": 45, "F": 45, "G": 45,
-              "I": 35, "J": 35, "K": 35, "L": 40, "M": 40, "N": 40, "O": 40,
-              "P": 40, "Q": 40, "S": 55, "T": 55, "V": 45, "W": 45}
+    widths = {"A": 22, "B": 16, "C": 16, "D": 12, "E": 45, "F": 45, "G": 45,
+              "H": 45, "J": 35, "K": 35, "L": 35, "M": 40, "N": 40, "O": 40,
+              "P": 40, "Q": 40, "R": 40, "T": 55, "U": 55, "W": 45, "X": 45}
     for col, w in widths.items():
         ws.column_dimensions[col].width = w
     wb.save(path)

@@ -331,7 +331,9 @@ def dashboard_rows(seller_id: str, run_id: str) -> dict[str, Any]:
         d = _run_dir(store, seller_id, run_id)
         cached = d / "rows.json"
         if cached.exists():
-            return json.loads(cached.read_text(encoding="utf-8"))
+            payload = json.loads(cached.read_text(encoding="utf-8"))
+            if payload.get("header") == _BULK_HEADER:
+                return payload
         results = _load_results(store, seller_id, run_id)
         parse = _cached_parse(results["source_file"], seller_id)
         payload = {"header": _BULK_HEADER,
@@ -350,7 +352,9 @@ def _rows_for_run(store: Store, seller_id: str, run_id: str) -> list[list[Any]]:
     d = store.seller_dir(seller_id) / "outputs" / run_id
     cached = d / "rows.json"
     if cached.exists():
-        return json.loads(cached.read_text(encoding="utf-8"))["rows"]
+        payload = json.loads(cached.read_text(encoding="utf-8"))
+        if payload.get("header") == _BULK_HEADER:
+            return payload["rows"]
     rp = d / "results.json"
     if not rp.exists():
         return []
@@ -413,11 +417,11 @@ def catalog_view(seller_id: str) -> dict[str, Any]:
         _write_results_xlsx_rows(all_rows, d / "catalog_results.xlsx")
         _write_results_csv_rows(all_rows, d / "catalog_results.csv")
         ok_pairs = [
-            (r[0], {"title": r[6],
-                    "item_highlights": [h for h in (r[8], r[9], r[10]) if h],
-                    "bullets": [b for b in (r[12], r[14], r[16]) if b],
-                    "description": r[19], "search_terms": r[22]})
-            for r in all_rows if r[2] == "ok"
+            (r[0], {"title": r[7],
+                    "item_highlights": [h for h in (r[9], r[10], r[11]) if h],
+                    "bullets": [b for b in (r[13], r[15], r[17]) if b],
+                    "description": r[20], "search_terms": r[23]})
+            for r in all_rows if r[3] == "ok"
         ]
         n_upload = write_upload_subset(parse, ok_pairs, d / "catalog_upload.xlsx")
 
@@ -512,7 +516,8 @@ def flagged(seller_id: str, run_id: str) -> list[dict[str, Any]]:
             if s["status"] != "needs_review":
                 continue
             out.append({
-                "sku": s["sku"], "product_type": s["product_type"],
+                "sku": s["sku"], "asin": s.get("asin"),
+                "product_type": s["product_type"],
                 "issues": [i["message"] for i in s["issues"]
                            if i["severity"] == "error"],
                 "generated": s["generated"],

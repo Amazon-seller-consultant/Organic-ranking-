@@ -110,6 +110,16 @@ class ProductRecord:
         return self.first("brand")
 
     @property
+    def asin(self) -> Optional[str]:
+        """The listing's ASIN, when Amazon has assigned one. New listings
+        may carry a UPC/EAN/GTIN in this same field pair instead — those
+        are not ASINs and are intentionally not returned here."""
+        id_type = self.first("amzn1.volt.ca.product_id_type")
+        if id_type and id_type.strip().upper() == "ASIN":
+            return self.first("amzn1.volt.ca.product_id_value")
+        return None
+
+    @property
     def bullets(self) -> list[str]:
         return self.attributes.get("bullet_point", [])
 
